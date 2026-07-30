@@ -1,17 +1,238 @@
+/**
+ * Polykatoikia design tokens — "Aegean Ledger".
+ *
+ * Palette: deep Aegean teal (trust / primary), warm brass (attention / accent),
+ * cool marble neutrals (surfaces). Chosen to read as a Greek property-finance
+ * product without the generic indigo-on-white SaaS look.
+ *
+ * Contrast: every token pairing used for body text clears WCAG AA 4.5:1.
+ */
+
 :root {
-  --primary: #1e3a8a;
-  --danger: #dc2626;
-  --warning: #d97706;
-  --surface: #f8fafc;
-  --surface-2: #f1f5f9;
-  --surface-3: #e2e8f0;
-  --ink: #0f172a;
-  --ink-muted: #475569;
-  --border: #cbd5e1;
+  /* ---------- Palette: Aegean (primary) ---------- */
+  --aegean-50: #edfbfa;
+  --aegean-100: #d2f4f2;
+  --aegean-200: #a6e9e7;
+  --aegean-300: #6fd7d7;
+  --aegean-400: #38bcbf;
+  --aegean-500: #199ca3;
+  --aegean-600: #0e7d87;
+  --aegean-700: #0f6470;
+  --aegean-800: #12505b;
+  --aegean-900: #14434d;
+  --aegean-950: #062a32;
+
+  /* ---------- Palette: Brass (accent) ---------- */
+  --brass-50: #fdf8ed;
+  --brass-100: #faedce;
+  --brass-200: #f4d998;
+  --brass-300: #edc062;
+  --brass-400: #e5a73a;
+  --brass-500: #d08a1f;
+  --brass-600: #b36c17;
+  --brass-700: #8e5017;
+  --brass-800: #75401a;
+  --brass-900: #633619;
+
+  /* ---------- Palette: Marble (neutrals, cool petrol-tinted) ---------- */
+  --marble-0: #ffffff;
+  --marble-50: #f6f9fa;
+  --marble-100: #edf3f4;
+  --marble-200: #e2eaec;
+  --marble-300: #d0dcdf;
+  --marble-400: #a8bcc1;
+  --marble-500: #8a9ba3;
+  --marble-600: #5a6e77;
+  --marble-700: #3d525b;
+  --marble-800: #223840;
+  --marble-900: #142a33;
+  --marble-950: #0c1b22;
+
+  /* ---------- Semantic surfaces ---------- */
+  --surface: var(--marble-50);
+  --surface-raised: var(--marble-0);
+  --surface-sunken: var(--marble-100);
+  --surface-inverse: var(--marble-950);
+
+  /* Legacy aliases kept so pre-existing utility classes keep resolving. */
+  --surface-2: var(--marble-100);
+  --surface-3: var(--marble-200);
+
+  /* ---------- Semantic text ---------- */
+  --ink: var(--marble-950);
+  --ink-strong: var(--marble-900);
+  --ink-muted: var(--marble-600);
+  --ink-subtle: var(--marble-500);
+  --ink-inverse: var(--marble-0);
+
+  /* ---------- Semantic lines ---------- */
+  --border: var(--marble-300);
+  --border-soft: var(--marble-200);
+  --border-strong: var(--marble-400);
+
+  /* ---------- Semantic intent ---------- */
+  --primary: var(--aegean-600);
+  --primary-hover: var(--aegean-700);
+  --primary-active: var(--aegean-800);
+  --primary-soft: var(--aegean-50);
+  --primary-ring: var(--aegean-500);
+
+  --accent: var(--brass-500);
+  --accent-text: var(--brass-700);
+  --accent-soft: var(--brass-50);
+
+  --danger: #be2f2f;
+  --danger-hover: #a12424;
+  --danger-soft: #fdf1f1;
+  --warning: #a9660a;
+  --warning-soft: var(--brass-50);
+  --success: #14804a;
+  --success-soft: #edfaf2;
+
+  /* ---------- Typography ---------- */
+  --font-display: var(--font-manrope), "Manrope", system-ui, sans-serif;
+  --font-body: var(--font-commissioner), "Commissioner", system-ui, sans-serif;
+  --font-numeric: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace,
+    monospace;
+
+  --fs-2xs: 0.6875rem;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-base: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+  --fs-3xl: 2.25rem;
+  --fs-4xl: clamp(2.25rem, 4.5vw, 3.25rem);
+  --fs-5xl: clamp(2.75rem, 6.5vw, 4.25rem);
+
+  --lh-tight: 1.15;
+  --lh-snug: 1.3;
+  --lh-normal: 1.55;
+  --lh-relaxed: 1.7;
+
+  --tracking-tight: -0.02em;
+  --tracking-snug: -0.01em;
+  --tracking-wide: 0.04em;
+  --tracking-caps: 0.08em;
+
+  /* ---------- Spacing (4px base) ---------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+
+  /* ---------- Radius ---------- */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+  --radius-full: 9999px;
+
+  /* ---------- Elevation (petrol-tinted, never pure black) ---------- */
+  --shadow-sm: 0 1px 2px -1px rgb(12 27 34 / 0.1),
+    0 1px 3px 0 rgb(12 27 34 / 0.06);
+  --shadow-md: 0 4px 12px -4px rgb(12 27 34 / 0.12),
+    0 2px 6px -2px rgb(12 27 34 / 0.06);
+  --shadow-lg: 0 16px 32px -12px rgb(12 27 34 / 0.16),
+    0 4px 12px -6px rgb(12 27 34 / 0.08);
+  --shadow-xl: 0 32px 64px -20px rgb(12 27 34 / 0.22),
+    0 8px 20px -8px rgb(12 27 34 / 0.1);
+
+  /* ---------- Z-index scale ---------- */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 20;
+  --z-drawer: 30;
+  --z-modal: 40;
+  --z-toast: 50;
+
+  /* ---------- Motion ---------- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 340ms;
+
+  /* ---------- Layout ---------- */
   --touch-min: 44px;
+  --sidebar-width: 15.5rem;
+  --topbar-height: 3.75rem;
+  --content-max: 78rem;
 }
 
+/* Amounts are the product's primary data — always tabular and monospaced. */
 .font-mono-amounts {
-  font-family: var(--font-fira-code), ui-monospace, monospace;
+  font-family: var(--font-numeric);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Motion keyframes ---------- */
+
+/* 1. Section entry: content rises into place on navigation. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.75rem, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* 2. Skeleton shimmer: communicates "data is arriving", not "app is frozen". */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* 3. Drop target acknowledgement: ring breathes while a file hovers. */
+@keyframes ring-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(14 125 135 / 0.28);
+  }
+  50% {
+    box-shadow: 0 0 0 0.625rem rgb(14 125 135 / 0);
+  }
+}
+
+/* 4. Live status dot on the alerts badge. */
+@keyframes beacon {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

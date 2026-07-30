@@ -34,21 +34,58 @@ async function main() {
   });
 
   const apartments = [
-    { id: "seed-apt-a1", label: "Α1", shareBps: 2500 },
-    { id: "seed-apt-a2", label: "Α2", shareBps: 2500 },
-    { id: "seed-apt-b1", label: "Β1", shareBps: 3000 },
-    { id: "seed-apt-b2", label: "Β2", shareBps: 2000 },
+    {
+      id: "seed-apt-a1",
+      label: "Α1",
+      shareBps: 2500,
+      elevatorShareBps: 1500,
+      heatingShareBps: 2500,
+      floor: 1,
+    },
+    {
+      id: "seed-apt-a2",
+      label: "Α2",
+      shareBps: 2500,
+      elevatorShareBps: 1500,
+      heatingShareBps: 2500,
+      floor: 1,
+    },
+    {
+      id: "seed-apt-b1",
+      label: "Β1",
+      shareBps: 3000,
+      elevatorShareBps: 3500,
+      heatingShareBps: 3000,
+      floor: 2,
+    },
+    {
+      id: "seed-apt-b2",
+      label: "Β2",
+      shareBps: 2000,
+      elevatorShareBps: 3500,
+      heatingShareBps: 2000,
+      floor: 2,
+    },
   ] as const;
 
   for (const apt of apartments) {
     await prisma.apartment.upsert({
       where: { id: apt.id },
-      update: { shareBps: apt.shareBps, label: apt.label },
+      update: {
+        shareBps: apt.shareBps,
+        elevatorShareBps: apt.elevatorShareBps,
+        heatingShareBps: apt.heatingShareBps,
+        floor: apt.floor,
+        label: apt.label,
+      },
       create: {
         id: apt.id,
         buildingId: building.id,
         label: apt.label,
         shareBps: apt.shareBps,
+        elevatorShareBps: apt.elevatorShareBps,
+        heatingShareBps: apt.heatingShareBps,
+        floor: apt.floor,
       },
     });
   }
@@ -107,20 +144,45 @@ async function main() {
   }
 
   const categories = [
-    { id: "seed-cat-elevator", name: "Ανελκυστήρας", code: "ELEVATOR" },
-    { id: "seed-cat-cleaning", name: "Καθαριότητα", code: "CLEANING" },
-    { id: "seed-cat-heating", name: "Θέρμανση", code: "HEATING" },
-    { id: "seed-cat-common", name: "Κοινόχρηστα", code: "COMMON" },
+    {
+      id: "seed-cat-elevator",
+      name: "Ανελκυστήρας",
+      code: "ELEVATOR",
+      allocationMethod: "ELEVATOR_SHARES" as const,
+    },
+    {
+      id: "seed-cat-cleaning",
+      name: "Καθαριότητα",
+      code: "CLEANING",
+      allocationMethod: "GENERAL_SHARES" as const,
+    },
+    {
+      id: "seed-cat-heating",
+      name: "Θέρμανση",
+      code: "HEATING",
+      allocationMethod: "HEATING_SHARES" as const,
+    },
+    {
+      id: "seed-cat-common",
+      name: "Γενικά κοινόχρηστα",
+      code: "COMMON",
+      allocationMethod: "GENERAL_SHARES" as const,
+    },
   ] as const;
 
   for (const cat of categories) {
     await prisma.expenseCategory.upsert({
       where: { id: cat.id },
-      update: { name: cat.name, code: cat.code },
+      update: {
+        name: cat.name,
+        code: cat.code,
+        allocationMethod: cat.allocationMethod,
+      },
       create: {
         id: cat.id,
         name: cat.name,
         code: cat.code,
+        allocationMethod: cat.allocationMethod,
       },
     });
   }

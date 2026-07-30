@@ -1,18 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bell, LoaderCircle } from "lucide-react";
+import { BellOff, Check, ExternalLink, TriangleAlert } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { LoadingState } from "@/components/ui/LoadingState";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { AlertBadge } from "@/components/alerts/AlertBadge";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Button, buttonStyles } from "@/components/ui/Button";
+import {
+  AlertBadge,
+  severityKind,
+  statusKind,
+} from "@/components/alerts/AlertBadge";
 import {
   fetchAlerts,
   patchAlert,
   severityRank,
 } from "@/components/api/operator-api";
 import type { AlertListItem } from "@/lib/api-types";
+import { cn } from "@/lib/cn";
+
+const STATUS_FILTERS = [
+  { value: "OPEN", label: "Ανοιχτές" },
+  { value: "ALL", label: "Όλες" },
+  { value: "RESOLVED", label: "Επιλυμένες" },
+] as const;
 
 function formatCreatedAt(iso: string): string {
   try {
@@ -40,10 +52,10 @@ export default function AlertsInboxPage() {
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("OPEN");
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
     const result = await fetchAlerts();
     const sorted = [...result.data].sort((a, b) => {
       const sev = severityRank(a.severity) - severityRank(b.severity);
@@ -56,8 +68,20 @@ export default function AlertsInboxPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    void (async () => {
+      await load();
+    })();
   }, [load]);
+
+  const visible = useMemo(() => {
+    if (statusFilter === "ALL") return alerts;
+    if (statusFilter === "RESOLVED") {
+      return alerts.filter((a) => a.status === "RESOLVED");
+    }
+    return alerts.filter((a) => a.status !== "RESOLVED");
+  }, [alerts, statusFilter]);
+
+  const openCount = alerts.filter((a) => a.status === "OPEN").length;
 
   async function updateStatus(id: string, status: "ACKED" | "RESOLVED") {
     setError(null);
@@ -67,112 +91,164 @@ export default function AlertsInboxPage() {
     if (!result.ok) {
       setError(
         result.pending
-          ? "API pending — alert PATCH is not available yet."
+          ? "Η ενημέρωση ειδοποιήσεων δεν είναι ακόμη διαθέσιμη."
           : result.message,
       );
       return;
     }
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status } : a)),
-    );
+    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
       <PageHeader
-        title="Alerts inbox"
-        description="Severity-sorted integrity alerts. ADMIN can acknowledge or resolve."
+        eyebrow="Ακεραιότητα"
+        title="Ειδοποιήσεις"
+        description="Αποκλίσεις OCR και ανωμαλίες δαπανών, ταξινομημένες κατά σοβαρότητα."
       />
 
+      <div
+        className="rise flex flex-wrap items-center justify-between gap-4"
+        style={{ "--rise-delay": "60ms" } as React.CSSProperties}
+      >
+        <div
+          role="group"
+          aria-label="Φίλτρο κατάστασης"
+          className="flex flex-wrap gap-1 rounded-lg border border-border-soft bg-white/70 p-1"
+        >
+          {STATUS_FILTERS.map((filter) => {
+            const active = statusFilter === filter.value;
+            return (
+              <button
+                key={filter.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setStatusFilter(filter.value)}
+                className={cn(
+                  "min-h-9 cursor-pointer rounded-md px-3.5 text-sm font-semibold transition-colors duration-200 ease-out",
+                  active
+                    ? "bg-aegean-600 text-white shadow-sm"
+                    : "text-ink-muted hover:bg-marble-100 hover:text-ink",
+                )}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {!loading && openCount > 0 ? (
+          <p className="flex items-center gap-2 text-sm font-medium text-ink-muted">
+            <span
+              className="beacon size-2 rounded-full bg-[var(--danger)]"
+              aria-hidden
+            />
+            {openCount} ανοιχτές ειδοποιήσεις
+          </p>
+        ) : null}
+      </div>
+
       {error ? (
-        <p role="alert" className="text-sm text-[var(--danger)]">
+        <p
+          role="alert"
+          className="rounded-md border border-[color-mix(in_srgb,var(--danger)_30%,white)] bg-[var(--danger-soft)] px-3 py-2.5 text-sm text-[var(--danger)]"
+        >
           {error}
         </p>
       ) : null}
 
       {loading ? (
-        <LoadingState label="Loading alerts…" />
-      ) : alerts.length === 0 ? (
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 3 }, (_, i) => (
+            <Skeleton key={i} className="h-36 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : visible.length === 0 ? (
         <EmptyState
-          icon={Bell}
-          title="No alerts"
-          description="OCR mismatches and spend anomalies will appear here when APIs are live."
+          icon={BellOff}
+          title="Καθαρή εικόνα"
+          description="Δεν υπάρχουν ειδοποιήσεις για το επιλεγμένο φίλτρο. Οι αποκλίσεις OCR και οι ανωμαλίες δαπανών εμφανίζονται εδώ."
           pending={pending}
         />
       ) : (
-        <ul className="divide-y divide-[var(--border)] border border-[var(--border)]">
-          {alerts.map((alert) => {
+        <ul className="rise flex flex-col gap-4">
+          {visible.map((alert) => {
             const href = relatedHref(alert);
             const isMismatch = alert.type === "OCR_MISMATCH";
+            const busy = actionId === alert.id;
             return (
-              <li key={alert.id} className="space-y-3 px-4 py-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap gap-1.5">
-                      <AlertBadge
-                        kind={isMismatch ? "mismatch" : "anomaly"}
-                        label={alert.type.replace("_", " ")}
-                      />
-                      <AlertBadge kind="high" label={alert.severity} />
-                      <AlertBadge
-                        kind={
-                          alert.status === "OPEN"
-                            ? "open"
-                            : alert.status === "ACKED"
-                              ? "acked"
-                              : "resolved"
-                        }
-                      />
+              <li key={alert.id} className="card-interactive p-5">
+                <div className="flex items-start gap-4">
+                  <span
+                    className={cn(
+                      "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg",
+                      isMismatch
+                        ? "bg-[var(--danger-soft)] text-[var(--danger)]"
+                        : "bg-[var(--warning-soft)] text-[var(--warning)]",
+                    )}
+                  >
+                    <TriangleAlert
+                      className="size-5"
+                      aria-hidden
+                      strokeWidth={2}
+                    />
+                  </span>
+
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AlertBadge kind={isMismatch ? "mismatch" : "anomaly"} />
+                      <AlertBadge kind={severityKind(alert.severity)} />
+                      <AlertBadge kind={statusKind(String(alert.status))} />
                     </div>
-                    <h2 className="text-sm font-semibold text-[var(--ink)]">
+
+                    <h2 className="font-display text-base font-bold text-ink">
                       {alert.title}
                     </h2>
-                    {alert.body ? (
-                      <p className="text-sm text-[var(--ink-muted)]">
-                        {alert.body}
-                      </p>
-                    ) : null}
-                    <p className="font-mono-amounts text-xs text-[var(--ink-muted)]">
-                      {formatCreatedAt(alert.createdAt)}
-                      {alert.transactionId
-                        ? ` · tx ${alert.transactionId}`
-                        : ""}
-                    </p>
-                  </div>
-                </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {href ? (
-                    <Link
-                      href={href}
-                      className="inline-flex min-h-11 items-center border border-[var(--border)] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
-                    >
-                      Related ledger
-                    </Link>
-                  ) : null}
-                  {alert.status === "OPEN" ? (
-                    <button
-                      type="button"
-                      disabled={actionId === alert.id}
-                      onClick={() => void updateStatus(alert.id, "ACKED")}
-                      className="inline-flex min-h-11 items-center gap-2 border border-[var(--primary)] px-3 text-sm text-[var(--primary)] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
-                    >
-                      {actionId === alert.id ? (
-                        <LoaderCircle className="size-4 animate-spin" aria-hidden />
+                    {alert.body ? (
+                      <p className="text-sm text-ink-muted">{alert.body}</p>
+                    ) : null}
+
+                    <p className="font-mono-amounts text-xs text-ink-subtle">
+                      {formatCreatedAt(alert.createdAt)}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-2">
+                      {href ? (
+                        <Link
+                          href={href}
+                          className={buttonStyles("secondary", "sm")}
+                        >
+                          <ExternalLink
+                            className="size-4"
+                            aria-hidden
+                            strokeWidth={2}
+                          />
+                          Σχετική κίνηση
+                        </Link>
                       ) : null}
-                      Acknowledge
-                    </button>
-                  ) : null}
-                  {alert.status !== "RESOLVED" ? (
-                    <button
-                      type="button"
-                      disabled={actionId === alert.id}
-                      onClick={() => void updateStatus(alert.id, "RESOLVED")}
-                      className="inline-flex min-h-11 items-center gap-2 bg-[var(--primary)] px-3 text-sm text-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
-                    >
-                      Resolve
-                    </button>
-                  ) : null}
+                      {alert.status === "OPEN" ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          loading={busy}
+                          onClick={() => void updateStatus(alert.id, "ACKED")}
+                        >
+                          Λήψη γνώσης
+                        </Button>
+                      ) : null}
+                      {alert.status !== "RESOLVED" ? (
+                        <Button
+                          size="sm"
+                          loading={busy}
+                          onClick={() => void updateStatus(alert.id, "RESOLVED")}
+                        >
+                          <Check className="size-4" aria-hidden strokeWidth={2.5} />
+                          Επίλυση
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
               </li>
             );

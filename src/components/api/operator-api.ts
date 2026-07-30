@@ -5,10 +5,13 @@
 
 import type {
   AlertListItem,
+  ApartmentSharesItem,
   BuildingSummary,
   CreateReceiptResponse,
   CreateTransactionBody,
   CreateTransactionResponse,
+  ExpenseCategoryItem,
+  KoinoxristaPreview,
   PatchAlertBody,
   ReceiptDetail,
   TransactionListItem,
@@ -271,3 +274,201 @@ export function txHasMismatch(tx: TransactionListItem): boolean {
 export function txHasAnomaly(tx: TransactionListItem): boolean {
   return Boolean(tx.alerts?.some((a) => a.type === "ANOMALY"));
 }
+
+export async function fetchBuildingApartments(
+  buildingId: string,
+): Promise<
+  ApiResult<{
+    apartments: ApartmentSharesItem[];
+    totals: {
+      shareBps: number;
+      elevatorShareBps: number;
+      heatingShareBps: number;
+    };
+  }>
+> {
+  const empty = {
+    apartments: [] as ApartmentSharesItem[],
+    totals: { shareBps: 0, elevatorShareBps: 0, heatingShareBps: 0 },
+  };
+  try {
+    const res = await fetch(`/api/buildings/${buildingId}/apartments`, {
+      method: "GET",
+    });
+    if (res.status === 404 || res.status === 501) {
+      return pendingResult(empty);
+    }
+    if (!res.ok) {
+      return pendingResult(empty, `Apartments API ${res.status}`);
+    }
+    const json = (await parseJsonSafe(res)) as {
+      apartments: ApartmentSharesItem[];
+      totals: {
+        shareBps: number;
+        elevatorShareBps: number;
+        heatingShareBps: number;
+      };
+    };
+    return {
+      ok: true,
+      data: {
+        apartments: json.apartments ?? [],
+        totals: json.totals ?? empty.totals,
+      },
+    };
+  } catch {
+    return pendingResult(empty);
+  }
+}
+
+export async function patchApartmentShares(
+  buildingId: string,
+  body: {
+    apartmentId: string;
+    shareBps?: number;
+    elevatorShareBps?: number;
+    heatingShareBps?: number;
+    floor?: number | null;
+  },
+): Promise<ApiResult<ApartmentSharesItem | null>> {
+  try {
+    const res = await fetch(`/api/buildings/${buildingId}/apartments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 404 || res.status === 501) {
+      return pendingResult(null);
+    }
+    if (!res.ok) {
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Update failed (${res.status})`;
+      return errorResult(null, message);
+    }
+    const json = (await parseJsonSafe(res)) as {
+      apartment: ApartmentSharesItem;
+    };
+    return { ok: true, data: json.apartment };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export async function fetchExpenseCategories(): Promise<
+  ApiResult<ExpenseCategoryItem[]>
+> {
+  try {
+    const res = await fetch("/api/expense-categories", { method: "GET" });
+    if (res.status === 404 || res.status === 501) {
+      return pendingResult([]);
+    }
+    if (!res.ok) {
+      return pendingResult([], `Categories API ${res.status}`);
+    }
+    const json = (await parseJsonSafe(res)) as {
+      categories: ExpenseCategoryItem[];
+    };
+    return { ok: true, data: json.categories ?? [] };
+  } catch {
+    return pendingResult([]);
+  }
+}
+
+export async function patchExpenseCategory(body: {
+  id: string;
+  allocationMethod: ExpenseCategoryItem["allocationMethod"];
+}): Promise<ApiResult<ExpenseCategoryItem | null>> {
+  try {
+    const res = await fetch("/api/expense-categories", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 404 || res.status === 501) {
+      return pendingResult(null);
+    }
+    if (!res.ok) {
+      return errorResult(null, `Category update failed (${res.status})`);
+    }
+    const json = (await parseJsonSafe(res)) as { category: ExpenseCategoryItem };
+    return { ok: true, data: json.category };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export async function fetchKoinoxristaPreview(
+  buildingId: string,
+  year: number,
+  month: number,
+): Promise<ApiResult<KoinoxristaPreview | null>> {
+  try {
+    const res = await fetch(
+      `/api/buildings/${buildingId}/koinoxrista?year=${year}&month=${month}`,
+      { method: "GET" },
+    );
+    if (res.status === 404 || res.status === 501) {
+      return pendingResult(null);
+    }
+    if (!res.ok) {
+      return pendingResult(null, `Κοινόχρηστα API ${res.status}`);
+    }
+    const data = (await parseJsonSafe(res)) as KoinoxristaPreview;
+    return { ok: true, data };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export async function finalizeKoinoxrista(
+  buildingId: string,
+  year: number,
+  month: number,
+): Promise<
+  ApiResult<{
+    settlementId: string;
+    totalCents: number;
+    chargeTransactionIds: string[];
+  } | null>
+> {
+  try {
+    const res = await fetch(`/api/buildings/${buildingId}/koinoxrista`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ year, month }),
+    });
+    if (res.status === 404 || res.status === 501) {
+      return pendingResult(null);
+    }
+    if (!res.ok) {
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Finalize failed (${res.status})`;
+      return errorResult(null, message);
+    }
+    const data = (await parseJsonSafe(res)) as {
+      settlementId: string;
+      totalCents: number;
+      chargeTransactionIds: string[];
+    };
+    return { ok: true, data };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export const ALLOCATION_METHOD_LABELS: Record<
+  ExpenseCategoryItem["allocationMethod"],
+  string
+> = {
+  GENERAL_SHARES: "Γενικά χιλιοστά",
+  ELEVATOR_SHARES: "Χιλιοστά ανελκυστήρα",
+  HEATING_SHARES: "Χιλιοστά θέρμανσης",
+  EQUAL: "Ισόποσα",
+  MANUAL: "Χειροκίνητα",
+};

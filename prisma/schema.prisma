@@ -41,6 +41,20 @@ enum AlertStatus {
   RESOLVED
 }
 
+/// How an expense category is split across apartments (κανονισμός / πίνακας χιλιοστών).
+enum AllocationMethod {
+  GENERAL_SHARES
+  ELEVATOR_SHARES
+  HEATING_SHARES
+  EQUAL
+  MANUAL
+}
+
+enum SettlementStatus {
+  DRAFT
+  FINALIZED
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -49,10 +63,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  transactions   Transaction[] @relation("CreatedBy")
+  transactions   Transaction[]              @relation("CreatedBy")
   auditLogs      AuditLog[]
-  receipts       Receipt[]     @relation("ReceiptCreator")
-  resolvedAlerts Alert[]       @relation("ResolvedBy")
+  receipts       Receipt[]                  @relation("ReceiptCreator")
+  resolvedAlerts Alert[]                    @relation("ResolvedBy")
+  settlements    CommonExpenseSettlement[]  @relation("SettlementCreator")
 }
 
 model Building {
@@ -67,20 +82,29 @@ model Building {
   receipts       Receipt[]
   alerts         Alert[]
   dunningNotices DunningNotice[]
+  settlements    CommonExpenseSettlement[]
 }
 
 model Apartment {
-  id         String   @id @default(cuid())
-  buildingId String
-  building   Building @relation(fields: [buildingId], references: [id])
-  label      String
-  shareBps   Int
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id               String   @id @default(cuid())
+  buildingId       String
+  building         Building @relation(fields: [buildingId], references: [id])
+  label            String
+  /// Γενικά χιλιοστά as bps (10_000 = 100% = 1000‰).
+  shareBps         Int
+  /// Χιλιοστά ανελκυστήρα (0 = exempt for that key).
+  elevatorShareBps Int      @default(0)
+  /// Χιλιοστά θέρμανσης (static key; autonomy meters are a later extension).
+  heatingShareBps  Int      @default(0)
+  /// Floor index for display / future floor-weight helpers (0 = ισόγειο).
+  floor            Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  owners         ApartmentOwner[]
-  transactions   Transaction[]
-  dunningNotices DunningNotice[]
+  owners          ApartmentOwner[]
+  transactions    Transaction[]
+  dunningNotices  DunningNotice[]
+  settlementLines CommonExpenseSettlementLine[]
 }
 
 model Owner {
@@ -106,35 +130,77 @@ model ApartmentOwner {
 }
 
 model ExpenseCategory {
-  id        String   @id @default(cuid())
-  name      String
-  code      String?  @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String           @id @default(cuid())
+  name             String
+  code             String?          @unique
+  allocationMethod AllocationMethod @default(GENERAL_SHARES)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  transactions Transaction[]
+  transactions    Transaction[]
+  settlementLines CommonExpenseSettlementLine[]
+}
+
+model CommonExpenseSettlement {
+  id          String           @id @default(cuid())
+  buildingId  String
+  building    Building         @relation(fields: [buildingId], references: [id])
+  year        Int
+  month       Int
+  status      SettlementStatus @default(DRAFT)
+  totalCents  Int
+  createdById String
+  createdBy   User             @relation("SettlementCreator", fields: [createdById], references: [id])
+  finalizedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  lines              CommonExpenseSettlementLine[]
+  chargeTransactions Transaction[]
+
+  @@unique([buildingId, year, month])
+}
+
+model CommonExpenseSettlementLine {
+  id           String                  @id @default(cuid())
+  settlementId String
+  settlement   CommonExpenseSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  apartmentId  String
+  apartment    Apartment               @relation(fields: [apartmentId], references: [id])
+  categoryId   String?
+  category     ExpenseCategory?        @relation(fields: [categoryId], references: [id])
+  amountCents  Int
+  shareUsedBps Int
+  /// Source EXPENSE transaction ids included in this line.
+  expenseIds   Json?
+  createdAt    DateTime                @default(now())
 }
 
 model Transaction {
-  id                    String           @id @default(cuid())
+  id                    String                   @id @default(cuid())
   buildingId            String
-  building              Building         @relation(fields: [buildingId], references: [id])
+  building              Building                 @relation(fields: [buildingId], references: [id])
   apartmentId           String?
-  apartment             Apartment?       @relation(fields: [apartmentId], references: [id])
+  apartment             Apartment?               @relation(fields: [apartmentId], references: [id])
   categoryId            String?
-  category              ExpenseCategory? @relation(fields: [categoryId], references: [id])
+  category              ExpenseCategory?         @relation(fields: [categoryId], references: [id])
+  /// Links CHARGE rows minted by a κοινόχρηστα settlement (null for other txs).
+  settlementId          String?
+  settlement            CommonExpenseSettlement? @relation(fields: [settlementId], references: [id], onDelete: Cascade)
   type                  TransactionType
   amountCents           Int
   description           String?
   occurredAt            DateTime
-  receiptId             String?          @unique
-  receipt               Receipt?         @relation(fields: [receiptId], references: [id])
+  receiptId             String?                  @unique
+  receipt               Receipt?                 @relation(fields: [receiptId], references: [id])
   mismatchJustification String?
   createdById           String
-  createdBy             User             @relation("CreatedBy", fields: [createdById], references: [id])
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  createdBy             User                     @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
   alerts                Alert[]
+
+  @@index([settlementId])
 }
 
 model Receipt {

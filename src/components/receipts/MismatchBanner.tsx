@@ -1,5 +1,6 @@
-import { AlertTriangle } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { MoneyText } from "@/components/money/MoneyText";
+import { formatEurFromCents } from "@/domain/money";
 
 type MismatchBannerProps = {
   ocrAmountCents: number | null;
@@ -14,30 +15,46 @@ export function MismatchBanner({
     return null;
   }
 
+  const deltaCents = operatorAmountCents - ocrAmountCents;
+  const sign = deltaCents > 0 ? "+" : "−";
+
   return (
     <div
       role="alert"
-      className="flex gap-3 border border-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_8%,var(--surface))] px-4 py-3 text-[var(--danger)]"
+      className="rise flex gap-4 rounded-lg border border-[color-mix(in_srgb,var(--danger)_35%,white)] bg-[var(--danger-soft)] p-5"
     >
-      <AlertTriangle
-        className="mt-0.5 size-5 shrink-0"
+      <TriangleAlert
+        className="mt-0.5 size-5 shrink-0 text-[var(--danger)]"
         aria-hidden
-        strokeWidth={1.75}
+        strokeWidth={2}
       />
-      <div className="min-w-0 space-y-1 text-sm">
-        <p className="font-semibold">OCR amount differs from operator amount</p>
-        <p className="text-[var(--ink)]">
-          OCR: <MoneyText cents={ocrAmountCents} className="text-[var(--danger)]" />
-          {" · "}
-          Operator:{" "}
-          <MoneyText
-            cents={operatorAmountCents}
-            className="text-[var(--danger)]"
-          />
+      <div className="flex min-w-0 flex-col gap-3">
+        <p className="font-display font-bold text-[var(--danger)]">
+          Το ποσό OCR διαφέρει από το ποσό του χειριστή
         </p>
-        <p className="text-[var(--ink-muted)]">
-          A written justification of at least 20 characters is required before
-          posting.
+        <dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+          <div className="flex flex-col gap-0.5">
+            <dt className="eyebrow">OCR</dt>
+            <dd>
+              <MoneyText cents={ocrAmountCents} className="text-base" />
+            </dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="eyebrow">Χειριστής</dt>
+            <dd>
+              <MoneyText cents={operatorAmountCents} className="text-base" />
+            </dd>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <dt className="eyebrow">Διαφορά</dt>
+            <dd className="font-mono-amounts text-base font-semibold text-[var(--danger)]">
+              {sign} {formatEurFromCents(Math.abs(deltaCents))}
+            </dd>
+          </div>
+        </dl>
+        <p className="text-sm text-ink-muted">
+          Απαιτείται γραπτή αιτιολόγηση τουλάχιστον 20 χαρακτήρων πριν την
+          καταχώριση.
         </p>
       </div>
     </div>

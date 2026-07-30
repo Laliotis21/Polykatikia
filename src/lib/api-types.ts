@@ -104,3 +104,66 @@ export type AlertListItem = {
 export type PatchAlertBody = {
   status: "ACKED" | "RESOLVED";
 };
+
+export type AllocationMethod =
+  | "GENERAL_SHARES"
+  | "ELEVATOR_SHARES"
+  | "HEATING_SHARES"
+  | "EQUAL"
+  | "MANUAL";
+
+export type ApartmentSharesItem = {
+  id: string;
+  label: string;
+  shareBps: number;
+  elevatorShareBps: number;
+  heatingShareBps: number;
+  floor: number | null;
+  owner?: { id: string; name: string; email: string | null } | null;
+};
+
+export type ExpenseCategoryItem = {
+  id: string;
+  name: string;
+  code: string | null;
+  allocationMethod: AllocationMethod;
+};
+
+export type KoinoxristaLine = {
+  apartmentId: string;
+  apartmentLabel: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  allocationMethod: AllocationMethod;
+  amountCents: number;
+  shareUsedBps: number;
+  expenseIds: string[];
+};
+
+export type KoinoxristaApartmentStatement = {
+  apartmentId: string;
+  apartmentLabel: string;
+  totalCents: number;
+  lines: KoinoxristaLine[];
+};
+
+export type KoinoxristaPreview = {
+  buildingId: string;
+  year: number;
+  month: number;
+  from: string;
+  to: string;
+  existingSettlement: {
+    id: string;
+    status: "DRAFT" | "FINALIZED";
+    totalCents: number;
+    finalizedAt: string | null;
+  } | null;
+  statement: {
+    totalExpenseCents: number;
+    skippedManualCents: number;
+    skippedUncategorizedCents: number;
+    apartmentStatements: KoinoxristaApartmentStatement[];
+    lines: KoinoxristaLine[];
+  };
+};

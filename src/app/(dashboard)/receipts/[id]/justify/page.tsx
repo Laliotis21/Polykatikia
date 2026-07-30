@@ -2,12 +2,16 @@
 
 import { Suspense, use, useId, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LoaderCircle } from "lucide-react";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { Button, buttonStyles } from "@/components/ui/Button";
+import { Field, controlStyles } from "@/components/ui/Field";
 import { MoneyText } from "@/components/money/MoneyText";
 import { MismatchBanner } from "@/components/receipts/MismatchBanner";
+import { ReceiptSteps } from "@/components/receipts/ReceiptSteps";
 import { createTransaction } from "@/components/api/operator-api";
+import { cn } from "@/lib/cn";
 
 const MIN_JUSTIFICATION = 20;
 
@@ -36,11 +40,14 @@ function JustifyForm({ receiptId }: { receiptId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const reasonLength = reason.trim().length;
+  const reasonSatisfied = reasonLength >= MIN_JUSTIFICATION;
+
   const valid = useMemo(() => {
     if (!Number.isInteger(amountCents) || amountCents <= 0) return false;
     if (!amountsDiffer) return true;
-    return reason.trim().length >= MIN_JUSTIFICATION;
-  }, [amountCents, amountsDiffer, reason]);
+    return reasonSatisfied;
+  }, [amountCents, amountsDiffer, reasonSatisfied]);
 
   async function submit() {
     setError(null);
@@ -60,7 +67,7 @@ function JustifyForm({ receiptId }: { receiptId: string }) {
     if (!result.ok) {
       setError(
         result.pending
-          ? "API pending — transaction endpoint is not available yet."
+          ? "Το API καταχώρισης κινήσεων δεν είναι ακόμη διαθέσιμο."
           : result.message,
       );
       return;
@@ -71,27 +78,43 @@ function JustifyForm({ receiptId }: { receiptId: string }) {
 
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
     return (
-      <div className="space-y-3">
-        <PageHeader title="Mismatch justification" />
-        <p className="text-sm text-[var(--danger)]" role="alert">
-          Missing operator amount. Return to OCR review and continue again.
-        </p>
+      <div className="flex flex-col gap-8">
+        <PageHeader
+          eyebrow="Καταχώριση δαπάνης"
+          title="Αιτιολόγηση απόκλισης"
+        />
+        <div
+          role="alert"
+          className="rise flex flex-col items-start gap-4 rounded-lg border border-[color-mix(in_srgb,var(--danger)_30%,white)] bg-[var(--danger-soft)] p-5"
+        >
+          <p className="text-sm text-[var(--danger)]">
+            Λείπει το ποσό του χειριστή. Επιστρέψτε στον έλεγχο OCR και
+            συνεχίστε ξανά.
+          </p>
+          <Link
+            href={`/receipts/${receiptId}/review`}
+            className={buttonStyles("secondary", "sm")}
+          >
+            Επιστροφή στον έλεγχο
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-8">
       <PageHeader
-        title={
-          amountsDiffer ? "Mismatch justification" : "Confirm expense post"
-        }
+        eyebrow="Καταχώριση δαπάνης"
+        title={amountsDiffer ? "Αιτιολόγηση απόκλισης" : "Επιβεβαίωση καταχώρισης"}
         description={
           amountsDiffer
-            ? "Operator amount differs from OCR. Provide a written reason (≥20 characters)."
-            : "Amounts match (or OCR missing). Post the expense transaction."
+            ? "Το ποσό σας διαφέρει από το OCR. Τεκμηριώστε γραπτώς τον λόγο πριν την καταχώριση."
+            : "Τα ποσά συμφωνούν. Καταχωρίστε τη δαπάνη στο καθολικό του κτιρίου."
         }
       />
+
+      <ReceiptSteps current={2} />
 
       {amountsDiffer ? (
         <MismatchBanner
@@ -100,74 +123,105 @@ function JustifyForm({ receiptId }: { receiptId: string }) {
         />
       ) : null}
 
-      <dl className="grid grid-cols-[9rem_1fr] gap-x-4 gap-y-2 text-sm">
-        <dt className="text-[var(--ink-muted)]">Operator amount</dt>
-        <dd>
-          <MoneyText cents={amountCents} className="text-base" />
-        </dd>
-        <dt className="text-[var(--ink-muted)]">OCR amount</dt>
-        <dd>
-          <MoneyText cents={ocrAmountCents} className="text-base" />
-        </dd>
-        <dt className="text-[var(--ink-muted)]">Receipt</dt>
-        <dd className="font-mono-amounts break-all text-xs">{receiptId}</dd>
-      </dl>
+      <section
+        className="rise panel p-6"
+        style={{ "--rise-delay": "80ms" } as React.CSSProperties}
+        aria-labelledby="summary-heading"
+      >
+        <h2
+          id="summary-heading"
+          className="font-display text-lg font-bold text-ink"
+        >
+          Σύνοψη καταχώρισης
+        </h2>
+        <dl className="grid gap-x-8 gap-y-5 pt-5 sm:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <dt className="eyebrow">Ποσό χειριστή</dt>
+            <dd>
+              <MoneyText cents={amountCents} className="text-xl font-semibold" />
+            </dd>
+          </div>
+          <div className="flex flex-col gap-1">
+            <dt className="eyebrow">Ποσό OCR</dt>
+            <dd>
+              <MoneyText cents={ocrAmountCents} className="text-xl" />
+            </dd>
+          </div>
+          {description ? (
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <dt className="eyebrow">Περιγραφή</dt>
+              <dd className="text-ink">{description}</dd>
+            </div>
+          ) : null}
+        </dl>
+      </section>
 
       {amountsDiffer ? (
-        <div className="space-y-2">
-          <label
+        <section
+          className="rise"
+          style={{ "--rise-delay": "140ms" } as React.CSSProperties}
+        >
+          <Field
             htmlFor={reasonId}
-            className="block text-sm font-medium text-[var(--danger)]"
+            label={`Αιτιολόγηση (υποχρεωτική, ≥${MIN_JUSTIFICATION} χαρακτήρες)`}
+            aside={
+              <span
+                className={cn(
+                  "font-mono-amounts",
+                  reasonSatisfied ? "text-[var(--success)]" : "text-[var(--danger)]",
+                )}
+              >
+                {reasonLength}/{MIN_JUSTIFICATION}
+              </span>
+            }
+            hint="Περιγράψτε γιατί το ποσό διαφέρει — π.χ. έκπτωση, μερική πληρωμή, λάθος ανάγνωση."
           >
-            Justification (required, ≥{MIN_JUSTIFICATION} characters)
-          </label>
-          <textarea
-            id={reasonId}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={4}
-            className="min-h-[7rem] w-full border border-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_5%,var(--surface))] px-3 py-2 text-sm text-[var(--ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--danger)]"
-            aria-invalid={reason.trim().length > 0 && !valid}
-            aria-describedby={`${reasonId}-count`}
-          />
-          <p
-            id={`${reasonId}-count`}
-            className={`text-xs ${
-              reason.trim().length >= MIN_JUSTIFICATION
-                ? "text-[var(--ink-muted)]"
-                : "text-[var(--danger)]"
-            }`}
-          >
-            {reason.trim().length} / {MIN_JUSTIFICATION} characters
-          </p>
-        </div>
+            <textarea
+              id={reasonId}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={4}
+              aria-invalid={reasonLength > 0 && !reasonSatisfied}
+              aria-describedby={`${reasonId}-hint`}
+              className={cn(
+                controlStyles,
+                "min-h-28 resize-y py-2.5 text-base",
+                !reasonSatisfied &&
+                  "border-[color-mix(in_srgb,var(--danger)_45%,white)] bg-[var(--danger-soft)]",
+              )}
+            />
+          </Field>
+        </section>
       ) : null}
 
       {error ? (
-        <p role="alert" className="text-sm text-[var(--danger)]">
+        <p
+          role="alert"
+          className="rounded-md border border-[color-mix(in_srgb,var(--danger)_30%,white)] bg-[var(--danger-soft)] px-3 py-2.5 text-sm text-[var(--danger)]"
+        >
           {error}
         </p>
       ) : null}
 
-      <button
-        type="button"
-        disabled={!valid || submitting}
-        onClick={submit}
-        className={`inline-flex min-h-11 min-w-[12rem] items-center justify-center gap-2 px-4 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-          amountsDiffer
-            ? "bg-[var(--danger)] focus-visible:outline-[var(--danger)]"
-            : "bg-[var(--primary)] focus-visible:outline-[var(--primary)]"
-        }`}
-      >
-        {submitting ? (
-          <>
-            <LoaderCircle className="size-4 animate-spin" aria-hidden />
-            Posting…
-          </>
-        ) : (
-          "Post expense"
-        )}
-      </button>
+      <div className="flex flex-wrap items-center gap-4">
+        <Button
+          type="button"
+          size="lg"
+          variant={amountsDiffer ? "danger" : "primary"}
+          disabled={!valid}
+          loading={submitting}
+          loadingLabel="Καταχώριση…"
+          onClick={submit}
+        >
+          Καταχώριση δαπάνης
+        </Button>
+        <Link
+          href={`/receipts/${receiptId}/review`}
+          className={buttonStyles("ghost", "lg")}
+        >
+          Πίσω στον έλεγχο
+        </Link>
+      </div>
     </div>
   );
 }
@@ -180,8 +234,8 @@ export default function MismatchJustifyPage({
   const { id } = use(params);
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <Suspense fallback={<LoadingState label="Loading justification…" />}>
+    <div className="mx-auto w-full max-w-3xl">
+      <Suspense fallback={<LoadingState label="Φόρτωση αιτιολόγησης…" />}>
         <JustifyForm receiptId={id} />
       </Suspense>
     </div>

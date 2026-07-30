@@ -2,7 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /** Dashboard (route-group) URL prefixes — marketing `/` stays public. */
-const DASHBOARD_PREFIXES = ["/receipts", "/alerts", "/buildings"] as const;
+const DASHBOARD_PREFIXES = [
+  "/overview",
+  "/receipts",
+  "/alerts",
+  "/buildings",
+] as const;
 
 function isDashboardPath(pathname: string): boolean {
   return DASHBOARD_PREFIXES.some(
@@ -15,7 +20,7 @@ function isDashboardPath(pathname: string): boolean {
  * Unauthenticated users are redirected away from `(dashboard)` routes.
  * App-level AuthZ still lives in route handlers via `getSessionUser`.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
     request: { headers: request.headers },
   });
@@ -59,7 +64,7 @@ export async function middleware(request: NextRequest) {
 
   if (request.nextUrl.pathname === "/login" && user) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/receipts/upload";
+    redirectUrl.pathname = "/overview";
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }

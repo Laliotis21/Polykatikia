@@ -2,21 +2,268 @@
 @import "../styles/tokens.css";
 
 @theme inline {
+  /* Palette */
+  --color-aegean-50: var(--aegean-50);
+  --color-aegean-100: var(--aegean-100);
+  --color-aegean-200: var(--aegean-200);
+  --color-aegean-300: var(--aegean-300);
+  --color-aegean-400: var(--aegean-400);
+  --color-aegean-500: var(--aegean-500);
+  --color-aegean-600: var(--aegean-600);
+  --color-aegean-700: var(--aegean-700);
+  --color-aegean-800: var(--aegean-800);
+  --color-aegean-900: var(--aegean-900);
+  --color-aegean-950: var(--aegean-950);
+
+  --color-brass-50: var(--brass-50);
+  --color-brass-100: var(--brass-100);
+  --color-brass-200: var(--brass-200);
+  --color-brass-300: var(--brass-300);
+  --color-brass-400: var(--brass-400);
+  --color-brass-500: var(--brass-500);
+  --color-brass-600: var(--brass-600);
+  --color-brass-700: var(--brass-700);
+
+  --color-marble-0: var(--marble-0);
+  --color-marble-50: var(--marble-50);
+  --color-marble-100: var(--marble-100);
+  --color-marble-200: var(--marble-200);
+  --color-marble-300: var(--marble-300);
+  --color-marble-400: var(--marble-400);
+  --color-marble-500: var(--marble-500);
+  --color-marble-600: var(--marble-600);
+  --color-marble-700: var(--marble-700);
+  --color-marble-800: var(--marble-800);
+  --color-marble-900: var(--marble-900);
+  --color-marble-950: var(--marble-950);
+
+  /* Semantic */
   --color-primary: var(--primary);
+  --color-accent: var(--accent);
   --color-danger: var(--danger);
   --color-warning: var(--warning);
+  --color-success: var(--success);
   --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-surface-3: var(--surface-3);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
   --color-border: var(--border);
-  --font-sans: var(--font-fira-sans);
-  --font-mono: var(--font-fira-code);
+  --color-border-soft: var(--border-soft);
+
+  /* Type */
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-numeric);
+
+  --text-2xs: var(--fs-2xs);
+  --text-xs: var(--fs-xs);
+  --text-sm: var(--fs-sm);
+  --text-base: var(--fs-base);
+  --text-lg: var(--fs-lg);
+  --text-xl: var(--fs-xl);
+  --text-2xl: var(--fs-2xl);
+  --text-3xl: var(--fs-3xl);
+  --text-4xl: var(--fs-4xl);
+  --text-5xl: var(--fs-5xl);
+
+  /* Radius */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+
+  /* Elevation */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+
+  /* Motion */
+  --ease-out: var(--ease-out);
+  --animate-rise-in: rise-in var(--duration-slow) var(--ease-out) both;
 }
 
-body {
-  background: var(--surface);
-  color: var(--ink);
-  font-family: var(--font-fira-sans), system-ui, sans-serif;
+@layer base {
+  html {
+    background-color: var(--surface);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: var(--fs-base);
+    line-height: var(--lh-normal);
+    font-feature-settings: "cv05" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    line-height: var(--lh-tight);
+    letter-spacing: var(--tracking-tight);
+    color: var(--ink);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Native controls inherit the type system rather than the UA default. */
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--primary-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background: var(--aegean-200);
+    color: var(--aegean-950);
+  }
+}
+
+@layer components {
+  /**
+   * Atmospheric backdrop: three soft light sources over a marble gradient,
+   * plus a faint architectural grid that fades out down the page.
+   * Rendered once from the root layout, fixed behind all content.
+   */
+  .app-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        58rem 38rem at 6% -12%,
+        rgb(14 125 135 / 0.13),
+        transparent 62%
+      ),
+      radial-gradient(
+        42rem 32rem at 102% -4%,
+        rgb(208 138 31 / 0.09),
+        transparent 58%
+      ),
+      radial-gradient(
+        52rem 44rem at 46% 116%,
+        rgb(25 156 163 / 0.08),
+        transparent 62%
+      ),
+      linear-gradient(
+        176deg,
+        #f9fcfc 0%,
+        var(--surface) 38%,
+        var(--marble-100) 100%
+      );
+  }
+
+  .app-backdrop::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(to right, rgb(20 42 51 / 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(20 42 51 / 0.03) 1px, transparent 1px);
+    background-size: 3.5rem 3.5rem;
+    -webkit-mask-image: radial-gradient(
+      ellipse 110% 65% at 50% 0%,
+      #000 15%,
+      transparent 78%
+    );
+    mask-image: radial-gradient(
+      ellipse 110% 65% at 50% 0%,
+      #000 15%,
+      transparent 78%
+    );
+  }
+
+  /* Frosted chrome for sticky navigation surfaces only. */
+  .glass-chrome {
+    background: rgb(255 255 255 / 0.78);
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+  }
+
+  /**
+   * Panel: a quiet grouping surface for static content (tables, summaries).
+   * Not a card — no lift, no pointer affordance.
+   */
+  .panel {
+    background: rgb(255 255 255 / 0.72);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-lg);
+  }
+
+  /**
+   * Card: reserved for containers the user can actually act on
+   * (links, drop targets, actionable records).
+   */
+  .card-interactive {
+    background: var(--surface-raised);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition:
+      border-color var(--duration-base) var(--ease-out),
+      box-shadow var(--duration-base) var(--ease-out),
+      transform var(--duration-base) var(--ease-out);
+  }
+
+  .card-interactive:hover {
+    border-color: var(--aegean-300);
+    box-shadow: var(--shadow-md);
+    transform: translate3d(0, -2px, 0);
+  }
+
+  /* Skeleton placeholder with a directional shimmer. */
+  .skeleton {
+    background-image: linear-gradient(
+      90deg,
+      var(--marble-200) 0%,
+      var(--marble-100) 40%,
+      var(--marble-200) 80%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Section entry motion, staggered by the `--rise-delay` custom property. */
+  .rise {
+    animation: rise-in var(--duration-slow) var(--ease-out) both;
+    animation-delay: var(--rise-delay, 0ms);
+  }
+
+  .beacon {
+    animation: beacon 1.8s var(--ease-in-out) infinite;
+  }
+
+  .ring-pulse {
+    animation: ring-pulse 1.6s var(--ease-out) infinite;
+  }
+
+  /* Small caps label used for section eyebrows and table headers. */
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: var(--fs-2xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--ink-subtle);
+  }
 }
