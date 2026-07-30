@@ -1,0 +1,8 @@
+{
+  "storagePath": "receipts/fixture-known.pdf",
+  "mimeType": "application/pdf",
+  "amountCents": 4520,
+  "vendor": "ΔΕΗ Α.Ε.",
+  "date": "2026-01-15",
+  "confidence": 0.97
+}
