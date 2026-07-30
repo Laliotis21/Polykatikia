@@ -18,6 +18,8 @@ const ALLOWED_MIME = new Set([
 
 /** Prisma `@default(cuid())` shape — refuse path segments / traversal. */
 const BUILDING_ID_RE = /^c[a-z0-9]{8,64}$/i;
+/** Fixed seed ids used by UI fallbacks (`seed-building-kolonaki`, etc.). */
+const SEED_BUILDING_ID_RE = /^seed-[a-z0-9-]{1,64}$/i;
 
 export function isAllowedReceiptMime(mimeType: string): boolean {
   return ALLOWED_MIME.has(mimeType.toLowerCase());
@@ -25,7 +27,7 @@ export function isAllowedReceiptMime(mimeType: string): boolean {
 
 /**
  * Sanitize buildingId for storage path segments.
- * Accepts cuid-like ids only; rejects `/`, `..`, `\0`, `\`.
+ * Accepts cuid-like ids and seed-* ids; rejects `/`, `..`, `\0`, `\`.
  */
 export function assertSafeBuildingId(buildingId: string): string {
   const id = buildingId?.trim() ?? "";
@@ -35,7 +37,7 @@ export function assertSafeBuildingId(buildingId: string): string {
     id.includes("\\") ||
     id.includes("\0") ||
     id.includes("..") ||
-    !BUILDING_ID_RE.test(id)
+    !(BUILDING_ID_RE.test(id) || SEED_BUILDING_ID_RE.test(id))
   ) {
     throw new Error("Invalid buildingId for storage path");
   }

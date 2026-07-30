@@ -13,6 +13,12 @@ describe("assertSafeBuildingId", () => {
     );
   });
 
+  it("accepts seed building ids", () => {
+    expect(assertSafeBuildingId("seed-building-kolonaki")).toBe(
+      "seed-building-kolonaki",
+    );
+  });
+
   it("rejects path traversal and separators", () => {
     expect(() => assertSafeBuildingId("../etc")).toThrow(/Invalid buildingId/);
     expect(() => assertSafeBuildingId("cabc/def")).toThrow(/Invalid buildingId/);
