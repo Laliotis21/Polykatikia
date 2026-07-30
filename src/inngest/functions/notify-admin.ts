@@ -45,7 +45,7 @@ export const notifyAdmin = inngest.createFunction(
     const recipients = admins.map((a) => a.email);
 
     await step.run("send-email", async () => {
-      return sendEmail({
+      const result = await sendEmail({
         to: recipients,
         subject: `[Polykatoikia] ${alert.type}: ${alert.title}`,
         text: [
@@ -59,6 +59,10 @@ export const notifyAdmin = inngest.createFunction(
           .filter(Boolean)
           .join("\n"),
       });
+      if (!result.sent) {
+        throw new Error(`email_not_sent:${result.reason}`);
+      }
+      return result;
     });
 
     return { sent: true, alertId, recipients: recipients.length };
