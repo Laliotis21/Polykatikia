@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+  VIEWER
+}
+
+enum TransactionType {
+  EXPENSE
+  INCOME
+  CHARGE
+}
+
+enum ReceiptStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum AlertType {
+  OCR_MISMATCH
+  ANOMALY
+}
+
+enum AlertSeverity {
+  HIGH
+}
+
+enum AlertStatus {
+  OPEN
+  ACKED
+  RESOLVED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      Role     @default(OPERATOR)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions   Transaction[] @relation("CreatedBy")
+  auditLogs      AuditLog[]
+  receipts       Receipt[]     @relation("ReceiptCreator")
+  resolvedAlerts Alert[]       @relation("ResolvedBy")
+}
+
+model Building {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  apartments     Apartment[]
+  transactions   Transaction[]
+  receipts       Receipt[]
+  alerts         Alert[]
+  dunningNotices DunningNotice[]
+}
+
+model Apartment {
+  id         String   @id @default(cuid())
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id])
+  label      String
+  shareBps   Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  owners         ApartmentOwner[]
+  transactions   Transaction[]
+  dunningNotices DunningNotice[]
+}
+
+model Owner {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  apartments     ApartmentOwner[]
+  dunningNotices DunningNotice[]
+}
+
+model ApartmentOwner {
+  id          String    @id @default(cuid())
+  apartmentId String
+  ownerId     String
+  apartment   Apartment @relation(fields: [apartmentId], references: [id])
+  owner       Owner     @relation(fields: [ownerId], references: [id])
+  fromDate    DateTime
+  toDate      DateTime?
+}
+
+model ExpenseCategory {
+  id        String   @id @default(cuid())
+  name      String
+  code      String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+}
+
+model Transaction {
+  id                    String           @id @default(cuid())
+  buildingId            String
+  building              Building         @relation(fields: [buildingId], references: [id])
+  apartmentId           String?
+  apartment             Apartment?       @relation(fields: [apartmentId], references: [id])
+  categoryId            String?
+  category              ExpenseCategory? @relation(fields: [categoryId], references: [id])
+  type                  TransactionType
+  amountCents           Int
+  description           String?
+  occurredAt            DateTime
+  receiptId             String?          @unique
+  receipt               Receipt?         @relation(fields: [receiptId], references: [id])
+  mismatchJustification String?
+  createdById           String
+  createdBy             User             @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  alerts                Alert[]
+}
+
+model Receipt {
+  id             String        @id @default(cuid())
+  buildingId     String
+  building       Building      @relation(fields: [buildingId], references: [id])
+  storagePath    String
+  mimeType       String
+  ocrAmountCents Int?
+  ocrVendor      String?
+  ocrRaw         Json?
+  status         ReceiptStatus @default(UPLOADED)
+  createdById    String
+  createdBy      User          @relation("ReceiptCreator", fields: [createdById], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  transaction    Transaction?
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      User     @relation(fields: [actorId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  payload    Json?
+  createdAt  DateTime @default(now())
+}
+
+model Alert {
+  id            String        @id @default(cuid())
+  buildingId    String?
+  building      Building?     @relation(fields: [buildingId], references: [id])
+  transactionId String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  type          AlertType
+  severity      AlertSeverity @default(HIGH)
+  status        AlertStatus   @default(OPEN)
+  title         String
+  body          String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  resolvedAt    DateTime?
+  resolvedById  String?
+  resolvedBy    User?         @relation("ResolvedBy", fields: [resolvedById], references: [id])
+}
+
+model DunningNotice {
+  id          String     @id @default(cuid())
+  buildingId  String
+  building    Building   @relation(fields: [buildingId], references: [id])
+  apartmentId String?
+  apartment   Apartment? @relation(fields: [apartmentId], references: [id])
+  ownerId     String?
+  owner       Owner?     @relation(fields: [ownerId], references: [id])
+  amountCents Int
+  dueDate     DateTime
+  status      String     @default("PENDING")
+  sentAt      DateTime?
+  createdAt   DateTime   @default(now())
+}

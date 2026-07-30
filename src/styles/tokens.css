@@ -1,0 +1,16 @@
+:root {
+  --primary: #1e3a8a;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --surface: #f8fafc;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
+  --ink: #0f172a;
+  --ink-muted: #475569;
+  --border: #cbd5e1;
+}
+
+.font-mono-amounts {
+  font-family: var(--font-fira-code), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
