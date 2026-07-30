@@ -1,11 +1,12 @@
 # Operator dashboard (Agent 4)
 
-Five screens under this route group:
+| Route | Screen |
+|-------|--------|
+| `/` (group index) | Redirect → `/receipts/upload` |
+| `/receipts/upload` | Receipt dropzone + building select |
+| `/receipts/[id]/review` | OCR fields + operator amount |
+| `/receipts/[id]/justify` | Mismatch justification (≥20) |
+| `/buildings/[id]/expenses` | Transaction ledger |
+| `/alerts` | Alerts inbox |
 
-1. `/receipts/upload`
-2. `/receipts/[id]/review`
-3. `/receipts/[id]/justify`
-4. `/buildings/[id]/expenses`
-5. `/alerts`
-
-Shell: sidebar + main; tokens from `src/styles/tokens.css`.
+Shell: `layout.tsx` → Sidebar + TopBar. Tokens: `src/styles/tokens.css`.
