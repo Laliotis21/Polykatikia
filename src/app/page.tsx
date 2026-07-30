@@ -15,10 +15,10 @@ export default function HomePage() {
       </p>
       <div className="pt-2">
         <Link
-          href="/receipts/upload"
+          href="/login"
           className="inline-flex min-h-11 items-center bg-[var(--primary)] px-4 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
         >
-          Open operator dashboard
+          Operator login
         </Link>
       </div>
     </main>

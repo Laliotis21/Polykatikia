@@ -52,7 +52,14 @@ export async function middleware(request: NextRequest) {
 
   if (isDashboardPath(request.nextUrl.pathname) && !user) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/";
+    redirectUrl.pathname = "/login";
+    redirectUrl.search = "";
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (request.nextUrl.pathname === "/login" && user) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/receipts/upload";
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }
