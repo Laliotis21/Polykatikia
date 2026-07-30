@@ -12,20 +12,33 @@
 
 # testing
 /coverage
+*.lcov
+.nyc_output
+.vitest/
+.jest/
 
 # next.js
 /.next/
 /out/
 
-# production
+# production / build
 /build
+/dist
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
 
 # local mock receipt storage (when Supabase Storage is not configured)
 .data/
+
+# temporary uploads / OCR scratch
+/uploads/
+/tmp/
+/temp/
+*.tmp
+*.temp
 
 # debug
 npm-debug.log*
@@ -41,9 +54,35 @@ yarn-error.log*
 .env.production
 !.env.example
 
-# vercel
+# vercel / turbo
 .vercel
+.turbo
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma (sqlite local DBs if ever used; keep schema/migrations tracked)
+prisma/*.db
+prisma/*.db-journal
+*.db
+*.db-journal
+
+# supabase local
+supabase/.branches
+supabase/.temp
+
+# inngest local
+.inngest/
+
+# graphify local regenerable artifacts (graph.html / cache / reports)
+graphify-out/
+
+# IDE / editors (keep shared .vscode settings if added later)
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
