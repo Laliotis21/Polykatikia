@@ -15,6 +15,30 @@ function client(db?: DbClient | null): DbClient {
   return db ?? prisma;
 }
 
+/** True when `db` is a Prisma interactive/transaction client (no `$transaction`). */
+export function isTransactionClient(
+  db: DbClient | null | undefined,
+): boolean {
+  if (db == null) return false;
+  return typeof (db as PrismaClient).$transaction !== "function";
+}
+
+/**
+ * Whether createAlert should enqueue Inngest notify.
+ * Default enqueueNotify is false; never notify inside a TransactionClient.
+ */
+export function shouldEnqueueAlertNotify(opts: {
+  enqueueNotify?: boolean;
+  severity: AlertSeverity;
+  type: AlertType;
+  isTxClient: boolean;
+}): boolean {
+  if (opts.isTxClient) return false;
+  if (!(opts.enqueueNotify ?? false)) return false;
+  if (opts.severity !== "HIGH") return false;
+  return opts.type === "OCR_MISMATCH" || opts.type === "ANOMALY";
+}
+
 /** Schema AlertType is OCR_MISMATCH | ANOMALY (OVERDUE is DunningNotice, not Alert). */
 export type CreateAlertInput = {
   type: AlertType;
@@ -24,9 +48,9 @@ export type CreateAlertInput = {
   transactionId?: string | null;
   severity?: AlertSeverity;
   /**
-   * When true (default), enqueue Inngest `alerts/notify-admin` after create
-   * for HIGH OCR_MISMATCH / ANOMALY. Set false inside a DB transaction and
-   * call {@link sendAlertNotifyEvent} after commit.
+   * When true, enqueue Inngest `alerts/notify-admin` after create for HIGH
+   * OCR_MISMATCH / ANOMALY. Default **false**. Always forced off when `db`
+   * is a TransactionClient — call {@link sendAlertNotifyEvent} after commit.
    */
   enqueueNotify?: boolean;
 };
@@ -35,15 +59,15 @@ export type CreateAlertResult = Alert;
 
 /**
  * Create an alert. Default severity HIGH.
- * For Agent 2 `$transaction` path: pass `db` + `enqueueNotify: false`, then
- * call `sendAlertNotifyEvent(alert.id)` after the transaction commits.
+ * For Agent 2 `$transaction` path: pass `db` + leave `enqueueNotify` false
+ * (default), then call `sendAlertNotifyEvent(alert.id)` after commit.
  */
 export async function createAlert(
   input: CreateAlertInput,
   db?: DbClient | null,
 ): Promise<CreateAlertResult> {
   const severity = input.severity ?? "HIGH";
-  const enqueueNotify = input.enqueueNotify ?? true;
+  const isTxClient = isTransactionClient(db);
 
   const alert = await client(db).alert.create({
     data: {
@@ -58,9 +82,12 @@ export async function createAlert(
   });
 
   if (
-    enqueueNotify &&
-    severity === "HIGH" &&
-    (alert.type === "OCR_MISMATCH" || alert.type === "ANOMALY")
+    shouldEnqueueAlertNotify({
+      enqueueNotify: input.enqueueNotify,
+      severity,
+      type: alert.type,
+      isTxClient,
+    })
   ) {
     await sendAlertNotifyEvent(alert.id);
   }

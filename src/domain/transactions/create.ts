@@ -10,6 +10,7 @@ import { createAlert, sendAlertNotifyEvent } from "@/domain/alerts";
 import { evaluateExpenseAnomalyForBuilding } from "@/domain/anomaly";
 import {
   assertMismatchJustification,
+  assertReceiptOcrLinkable,
   needsMismatchJustification,
 } from "./mismatch";
 
@@ -37,6 +38,12 @@ export type CreateTransactionResult = {
   alerts: CreatedAlertSummary[];
   anomalyFired: boolean;
   mismatchOverride: boolean;
+  /**
+   * When false, caller passed a TransactionClient (nested). Alerts were
+   * created with `enqueueNotify: false`; caller must
+   * `sendAlertNotifyEvent` after the outermost commit.
+   */
+  notifiedAfterCommit: boolean;
 };
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
@@ -53,7 +60,12 @@ function hasRootTransaction(db: DbClient): db is PrismaClient {
  * - `appendAuditLog(input, tx)` with `before`/`after`
  * - `createAlert(input, tx)` with `enqueueNotify: false`
  * - `evaluateExpenseAnomalyForBuilding(tx, …)` when category present
- * Then enqueues `sendAlertNotifyEvent` after commit for each HIGH alert.
+ * Then enqueues `sendAlertNotifyEvent` after commit for each HIGH alert
+ * **only when this call owns the outer `$transaction`**. Nested
+ * TransactionClient callers must notify after their outermost commit.
+ *
+ * Notify failures: after commit, `appendAuditLog(NOTIFY_FAILED)` then rethrow
+ * (tx data is already durable; admin email must not be silently dropped).
  */
 export async function createTransactionWithIntegrity(
   db: DbClient,
@@ -66,7 +78,7 @@ export async function createTransactionWithIntegrity(
 
   const run = async (
     tx: Prisma.TransactionClient,
-  ): Promise<CreateTransactionResult> => {
+  ): Promise<Omit<CreateTransactionResult, "notifiedAfterCommit">> => {
     let ocrAmountCents: number | null = null;
 
     if (input.receiptId) {
@@ -75,6 +87,7 @@ export async function createTransactionWithIntegrity(
         select: {
           id: true,
           buildingId: true,
+          status: true,
           ocrAmountCents: true,
           transaction: { select: { id: true } },
         },
@@ -88,6 +101,10 @@ export async function createTransactionWithIntegrity(
       if (receipt.transaction) {
         throw new Error("Receipt is already linked to a transaction");
       }
+      assertReceiptOcrLinkable({
+        receiptStatus: receipt.status,
+        ocrAmountCents: receipt.ocrAmountCents,
+      });
       ocrAmountCents = receipt.ocrAmountCents;
     }
 
@@ -207,18 +224,32 @@ export async function createTransactionWithIntegrity(
     return { transaction, alerts, anomalyFired, mismatchOverride };
   };
 
-  const result = hasRootTransaction(db)
+  const ownsOuterCommit = hasRootTransaction(db);
+  const result = ownsOuterCommit
     ? await db.$transaction(run)
     : await run(db);
 
-  // After commit: enqueue admin notify for each HIGH alert created in-tx.
-  for (const alert of result.alerts) {
-    try {
-      await sendAlertNotifyEvent(alert.id);
-    } catch {
-      // Inngest may be unconfigured locally; alerts are already persisted.
+  // After outermost commit only: enqueue admin notify for each HIGH alert.
+  // Nested TransactionClient: caller must notify after their commit.
+  if (ownsOuterCommit) {
+    for (const alert of result.alerts) {
+      try {
+        await sendAlertNotifyEvent(alert.id);
+      } catch (err) {
+        // Tx already committed — persist failure visibility, then surface.
+        await appendAuditLog({
+          actorId: input.createdById,
+          action: "NOTIFY_FAILED",
+          entityType: "Alert",
+          entityId: alert.id,
+          after: {
+            error: err instanceof Error ? err.message : String(err),
+          },
+        });
+        throw err;
+      }
     }
   }
 
-  return result;
+  return { ...result, notifiedAfterCommit: ownsOuterCommit };
 }

@@ -29,6 +29,27 @@ export function needsMismatchJustification(input: {
 }
 
 /**
+ * When a receipt is linked to a transaction, require OCR READY + non-null
+ * `ocrAmountCents`. Null OCR must not bypass mismatch / integrity gates.
+ */
+export function assertReceiptOcrLinkable(input: {
+  receiptStatus: string;
+  ocrAmountCents: number | null | undefined;
+}): void {
+  if (input.receiptStatus !== "READY") {
+    throw new MismatchJustificationError(
+      "Receipt OCR must be READY before linking to a transaction",
+    );
+  }
+  if (input.ocrAmountCents == null) {
+    throw new MismatchJustificationError(
+      "Receipt OCR amount is required before linking to a transaction",
+    );
+  }
+  assertCents(input.ocrAmountCents);
+}
+
+/**
  * OCR mismatch gate (design §4):
  * when operator amount ≠ OCR amount, require justification ≥ 20 chars.
  */

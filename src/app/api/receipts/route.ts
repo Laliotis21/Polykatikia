@@ -4,7 +4,12 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { AuthError, getSessionUser, requireOperator } from "@/lib/auth";
 import { createOcrProvider } from "@/domain/ocr";
-import { isAllowedReceiptMime, uploadReceiptFile } from "@/lib/storage";
+import {
+  assertSafeBuildingId,
+  MAX_RECEIPT_BYTES,
+  uploadReceiptFile,
+  validateReceiptBytes,
+} from "@/lib/storage";
 import type { CreateReceiptResponse } from "@/lib/api-types";
 
 export const runtime = "nodejs";
@@ -15,6 +20,7 @@ const buildingIdSchema = z.string().min(1);
  * POST /api/receipts
  * Multipart: `file` + `buildingId` → storage → OCR → Receipt READY draft.
  * OPERATOR+.
+ * Rejects before storage: size cap (10MB) + magic-byte mime (pdf/jpeg/png/webp).
  */
 export async function POST(request: Request) {
   try {
@@ -31,7 +37,16 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const buildingId = buildingIdParsed.data;
+
+    let buildingId: string;
+    try {
+      buildingId = assertSafeBuildingId(buildingIdParsed.data);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid buildingId" },
+        { status: 400 },
+      );
+    }
 
     if (!(file instanceof File)) {
       return NextResponse.json(
@@ -40,12 +55,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const mimeType = file.type || "application/octet-stream";
-    if (!isAllowedReceiptMime(mimeType)) {
+    if (file.size > MAX_RECEIPT_BYTES) {
+      return NextResponse.json(
+        { error: `File exceeds ${MAX_RECEIPT_BYTES / (1024 * 1024)}MB limit` },
+        { status: 400 },
+      );
+    }
+
+    const bytes = Buffer.from(await file.arrayBuffer());
+    let mimeType: string;
+    try {
+      mimeType = validateReceiptBytes(bytes).mimeType;
+    } catch (validationErr) {
       return NextResponse.json(
         {
           error:
-            "Unsupported mime type. Allowed: application/pdf, image/jpeg, image/png",
+            validationErr instanceof Error
+              ? validationErr.message
+              : "Invalid receipt file",
         },
         { status: 400 },
       );
@@ -59,7 +86,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Building not found" }, { status: 404 });
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
     const uploaded = await uploadReceiptFile({
       buildingId,
       mimeType,

@@ -77,19 +77,31 @@ export const dunningDaily = inngest.createFunction(
             buildingId: charge.buildingId,
           });
 
+          // Only mark sent when the email provider confirms delivery attempt.
+          if (!sendResult.sent) {
+            return {
+              status: "send_failed" as const,
+              noticeId: ensured.noticeId,
+            };
+          }
+
           await markDunningNoticeSent(ensured.noticeId, charge.id, dayKey);
 
           return {
             status: "sent" as const,
             noticeId: ensured.noticeId,
-            emailed: sendResult.sent,
+            emailed: true,
           };
         },
       );
 
       processed += 1;
       if (result.status === "sent" && result.emailed) emailed += 1;
-      if (result.status === "already_sent" || result.status === "no_email") {
+      if (
+        result.status === "already_sent" ||
+        result.status === "no_email" ||
+        result.status === "send_failed"
+      ) {
         skipped += 1;
       }
     }

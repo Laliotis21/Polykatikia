@@ -1,7 +1,9 @@
 export {
   createAlert,
+  isTransactionClient,
   listAlerts,
   listOpenAlerts,
+  shouldEnqueueAlertNotify,
   type CreateAlertInput,
   type CreateAlertResult,
   type DbClient,

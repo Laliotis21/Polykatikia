@@ -2,18 +2,32 @@ import { z } from "zod";
 
 const ocrProviderSchema = z.enum(["mock", "document_ai", "textract"]);
 
-const envSchema = z.object({
-  DATABASE_URL: z.string().min(1),
-  NEXT_PUBLIC_SUPABASE_URL: z.string().optional().default(""),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional().default(""),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default(""),
-  OCR_PROVIDER: ocrProviderSchema.default("mock"),
-  ANOMALY_MARGIN_BPS: z.coerce.number().int().default(3000),
-  RESEND_API_KEY: z.string().optional().default(""),
-  RESEND_FROM: z.string().optional().default("noreply@example.com"),
-  INNGEST_EVENT_KEY: z.string().optional().default(""),
-  INNGEST_SIGNING_KEY: z.string().optional().default(""),
-});
+const envSchema = z
+  .object({
+    DATABASE_URL: z.string().min(1),
+    NEXT_PUBLIC_SUPABASE_URL: z.string().optional().default(""),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional().default(""),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default(""),
+    OCR_PROVIDER: ocrProviderSchema.default("mock"),
+    ANOMALY_MARGIN_BPS: z.coerce.number().int().default(3000),
+    RESEND_API_KEY: z.string().optional().default(""),
+    RESEND_FROM: z.string().optional().default("noreply@example.com"),
+    INNGEST_EVENT_KEY: z.string().optional().default(""),
+    INNGEST_SIGNING_KEY: z.string().optional().default(""),
+    NODE_ENV: z
+      .enum(["development", "test", "production"])
+      .optional()
+      .default("development"),
+  })
+  .superRefine((data, ctx) => {
+    if (data.NODE_ENV === "production" && !data.INNGEST_SIGNING_KEY) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["INNGEST_SIGNING_KEY"],
+        message: "Required when NODE_ENV=production",
+      });
+    }
+  });
 
 export type Env = z.infer<typeof envSchema>;
 

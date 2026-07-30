@@ -1,5 +1,6 @@
 export {
   assertMismatchJustification,
+  assertReceiptOcrLinkable,
   needsMismatchJustification,
   MismatchJustificationError,
   MISMATCH_JUSTIFICATION_MIN_LENGTH,

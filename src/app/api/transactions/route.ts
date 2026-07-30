@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     }
     if (err instanceof Error) {
       if (
-        /Receipt not found|does not belong|already linked|positive integer|Money must be integer/i.test(
+        /Receipt not found|does not belong|already linked|positive integer|Money must be integer|OCR must be READY|OCR amount is required/i.test(
           err.message,
         )
       ) {
