@@ -162,10 +162,11 @@ export async function createTransactionWithIntegrity(
           action: "OCR_AMOUNT_OVERRIDE",
           entityType: "Transaction",
           entityId: transaction.id,
+          before: { ocrAmountCents },
           after: {
             amountCents: input.amountCents,
-            ocrAmountCents,
-            justification: input.mismatchJustification?.trim() ?? null,
+            mismatchJustification:
+              input.mismatchJustification?.trim() ?? null,
             alertId: alert.id,
           },
         },

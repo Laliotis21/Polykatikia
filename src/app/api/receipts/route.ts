@@ -89,13 +89,21 @@ export async function POST(request: Request) {
         mimeType,
       });
 
+      const ocrRaw = {
+        ...(extracted.raw && typeof extracted.raw === "object"
+          ? (extracted.raw as Record<string, unknown>)
+          : { value: extracted.raw }),
+        date: extracted.date,
+        confidence: extracted.confidence,
+      };
+
       const ready = await prisma.receipt.update({
         where: { id: receipt.id },
         data: {
           status: "READY",
           ocrAmountCents: extracted.amountCents,
           ocrVendor: extracted.vendor,
-          ocrRaw: extracted.raw as Prisma.InputJsonValue,
+          ocrRaw: ocrRaw as Prisma.InputJsonValue,
         },
       });
 

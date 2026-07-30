@@ -238,8 +238,20 @@ export async function patchAlert(
     if (!res.ok) {
       return errorResult(null, `Alert update failed (${res.status})`);
     }
-    const data = (await parseJsonSafe(res)) as { id: string; status: string };
-    return { ok: true, data };
+    const json = await parseJsonSafe(res);
+    // PATCH /api/alerts/:id returns `{ alert: { id, status, … } }`
+    const alert =
+      json &&
+      typeof json === "object" &&
+      "alert" in json &&
+      (json as { alert: unknown }).alert &&
+      typeof (json as { alert: unknown }).alert === "object"
+        ? ((json as { alert: { id: string; status: string } }).alert)
+        : (json as { id: string; status: string } | null);
+    if (!alert || typeof alert.id !== "string") {
+      return errorResult(null, "Unexpected alert PATCH response");
+    }
+    return { ok: true, data: { id: alert.id, status: String(alert.status) } };
   } catch {
     return pendingResult(null);
   }

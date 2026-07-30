@@ -46,6 +46,8 @@ export async function GET(request: Request) {
       buildingId: a.buildingId,
       transactionId: a.transactionId,
       createdAt: a.createdAt.toISOString(),
+      updatedAt: a.updatedAt.toISOString(),
+      resolvedAt: a.resolvedAt?.toISOString() ?? null,
     })),
   });
 }
