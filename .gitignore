@@ -62,11 +62,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma (sqlite local DBs if ever used; keep schema/migrations tracked)
+# prisma / sqlite local DBs (keep schema/migrations tracked)
 prisma/*.db
 prisma/*.db-journal
-*.db
-*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-journal
 
 # supabase local
 supabase/.branches
