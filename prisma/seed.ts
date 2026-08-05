@@ -906,6 +906,27 @@ async function main() {
     });
   }
 
+  await prisma.recurringExpense.upsert({
+    where: { id: "seed-recurring-kolonaki-gardener" },
+    update: {
+      label: "Κηπουρός",
+      amountCents: 15000,
+      categoryId: "seed-cat-common",
+      dayOfMonth: 1,
+      active: true,
+    },
+    create: {
+      id: "seed-recurring-kolonaki-gardener",
+      buildingId: KOLONAKI.id,
+      categoryId: "seed-cat-common",
+      label: "Κηπουρός",
+      amountCents: 15000,
+      dayOfMonth: 1,
+      active: true,
+      createdById: admin.id,
+    },
+  });
+
   const fromDate = new Date("2024-01-01T00:00:00.000Z");
   const buildingSummaries: Array<{
     id: string;
@@ -952,20 +973,19 @@ async function main() {
     };
   }
 
-  const [buildingCount, aptCount, expenseCount, chargeCount, openCharges, paidCharges, portalOwners] =
-    await Promise.all([
-      prisma.building.count(),
-      prisma.apartment.count(),
-      prisma.transaction.count({ where: { type: "EXPENSE" } }),
-      prisma.transaction.count({ where: { type: "CHARGE" } }),
-      prisma.transaction.count({
-        where: { type: "CHARGE", payment: { is: null } },
-      }),
-      prisma.transaction.count({
-        where: { type: "CHARGE", payment: { isNot: null } },
-      }),
-      prisma.owner.count({ where: { portalToken: { not: null } } }),
-    ]);
+  const buildingCount = await prisma.building.count();
+  const aptCount = await prisma.apartment.count();
+  const expenseCount = await prisma.transaction.count({ where: { type: "EXPENSE" } });
+  const chargeCount = await prisma.transaction.count({ where: { type: "CHARGE" } });
+  const openCharges = await prisma.transaction.count({
+    where: { type: "CHARGE", payment: { is: null } },
+  });
+  const paidCharges = await prisma.transaction.count({
+    where: { type: "CHARGE", payment: { isNot: null } },
+  });
+  const portalOwners = await prisma.owner.count({
+    where: { portalToken: { not: null } },
+  });
 
   console.log("Seed complete:", {
     admin: admin.email,
@@ -974,6 +994,7 @@ async function main() {
     buildings: buildingCount,
     apartments: aptCount,
     categories: categories.length,
+    recurring: "seed-recurring-kolonaki-gardener (Κηπουρός €150)",
     expenses: expenseCount,
     charges: { total: chargeCount, open: openCharges, paid: paidCharges },
     portalTokens: portalOwners,

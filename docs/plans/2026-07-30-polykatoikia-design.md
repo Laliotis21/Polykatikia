@@ -2,7 +2,8 @@
 
 > **Status:** Validated / locked — 2026-07-30  
 > **Rationale:** Option B — simplified vertical slice (integrity kernel first)  
-> **Scope:** Single management company, many buildings; integrity of money + OCR + anomaly + audit before multi-tenant or advanced ops
+> **Scope:** Single management company, many buildings; integrity of money + OCR + anomaly + audit before multi-tenant or advanced ops  
+> **Superseded (partial):** OCR mismatch *override* / justification path for receipt EXPENSE — see `2026-08-05-amount-integrity-design.md` (amounts lock to OCR; πάγια for recurring).
 
 ---
 

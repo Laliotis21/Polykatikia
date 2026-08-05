@@ -73,3 +73,12 @@ Seed (Κολωνάκι, `heatingAllocation = METER_READINGS`, Ιαν 2026): Α1=
 
 - Allocate in integer EUR cents.
 - Use largest-remainder (Hamilton) so Σ apartment amounts = expense total exactly.
+
+## Amount integrity (no operator-typed money)
+
+Expense `amountCents` must come from a trusted source — not free typing in daily ops:
+
+1. **Receipt OCR** — confirm / re-upload only; create EXPENSE with `amountCents === ocrAmountCents` (no mismatch override).
+2. **Πάγια (`RecurringExpense`)** — ADMIN sets amount; OPERATOR activate/pause; mint into the period before κοινόχρηστα preview/finalize.
+
+See `docs/plans/2026-08-05-amount-integrity-design.md`.
