@@ -5,7 +5,7 @@ import { AuthError, getSessionUser, requireOperator } from "@/lib/auth";
 import { assertCents } from "@/domain/money";
 import {
   createTransactionWithIntegrity,
-  MismatchJustificationError,
+  ReceiptAmountMismatchError,
 } from "@/domain/transactions";
 import type { CreateTransactionResponse } from "@/lib/api-types";
 
@@ -25,7 +25,7 @@ const createTransactionSchema = z.object({
 
 /**
  * POST /api/transactions
- * Validate → mismatch gate → create Transaction (+ Receipt link) + audit/alerts.
+ * Validate → OCR amount lock → create Transaction (+ Receipt link) + audit/alerts.
  * OPERATOR+.
  */
 export async function POST(request: Request) {
@@ -83,8 +83,8 @@ export async function POST(request: Request) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
-    if (err instanceof MismatchJustificationError) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
+    if (err instanceof ReceiptAmountMismatchError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
     }
     if (err instanceof Error) {
       if (
