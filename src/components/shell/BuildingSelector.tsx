@@ -72,11 +72,16 @@ export function BuildingSelector({
         notifyBuildingSelected(preferred.id);
         const path = pathnameRef.current;
         if (
-          /^\/buildings\/[^/]+\/(expenses|koinoxrista|shares|collections)/.test(
+          /^\/buildings\/[^/]+\/(expenses|koinoxrista|shares|collections|meters)/.test(
             path,
           )
         ) {
-          routerRef.current.replace(buildingScopedHref(path, preferred.id));
+          routerRef.current.replace(
+            buildingScopedHref(path, preferred.id, {
+              targetUsesMeters:
+                preferred.heatingAllocation === "METER_READINGS",
+            }),
+          );
         }
       }
     }
@@ -96,8 +101,17 @@ export function BuildingSelector({
     writeStoredBuildingId(nextId);
     onBuildingChange(nextId);
     notifyBuildingSelected(nextId);
-    if (/^\/buildings\/[^/]+\/(expenses|koinoxrista|shares)/.test(pathname)) {
-      router.push(buildingScopedHref(pathname, nextId));
+    if (
+      /^\/buildings\/[^/]+\/(expenses|koinoxrista|shares|collections|meters)/.test(
+        pathname,
+      )
+    ) {
+      const target = buildings.find((b) => b.id === nextId);
+      router.push(
+        buildingScopedHref(pathname, nextId, {
+          targetUsesMeters: target?.heatingAllocation === "METER_READINGS",
+        }),
+      );
     }
     onNavigate?.();
   }

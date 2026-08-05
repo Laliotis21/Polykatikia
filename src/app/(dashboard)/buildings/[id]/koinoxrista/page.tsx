@@ -113,13 +113,17 @@ export default function KoinoxristaPage({
         description="Κατανομή δαπανών περιόδου στα διαμερίσματα, βάσει των χιλιοστών κάθε κατηγορίας."
         actions={
           <>
-            <Link
-              href={`/buildings/${id}/meters`}
-              className={buttonStyles("secondary")}
-            >
-              <Gauge className="size-4" aria-hidden strokeWidth={2} />
-              Ενδείξεις
-            </Link>
+            {(preview?.heatingAllocation ??
+              preview?.statement.heatingAllocationMode) ===
+            "METER_READINGS" ? (
+              <Link
+                href={`/buildings/${id}/meters`}
+                className={buttonStyles("secondary")}
+              >
+                <Gauge className="size-4" aria-hidden strokeWidth={2} />
+                Ενδείξεις
+              </Link>
+            ) : null}
             <Link
               href={`/buildings/${id}/shares`}
               className={buttonStyles("secondary")}
@@ -184,7 +188,8 @@ export default function KoinoxristaPage({
             Περίοδος οριστικοποιημένη
           </Badge>
         ) : null}
-        {preview?.statement.heatingAllocationMode === "METER_UNITS" ? (
+        {preview?.statement.heatingAllocationMode === "METER_READINGS" ||
+        preview?.heatingAllocation === "METER_READINGS" ? (
           <Badge tone="primary" className="mb-3">
             Θέρμανση: ενδείξεις
           </Badge>
@@ -211,14 +216,16 @@ export default function KoinoxristaPage({
           {success}
         </p>
       ) : null}
-      {preview?.statement.missingHeatingReadingLabels &&
+      {preview?.statement.heatingAllocationMode === "METER_READINGS" &&
+      preview.statement.missingHeatingReadingLabels &&
       preview.statement.missingHeatingReadingLabels.length > 0 ? (
         <p
           role="status"
           className="rounded-md border border-brass-200 bg-[var(--warning-soft)] px-3 py-2.5 text-sm text-[var(--warning)]"
         >
           Ενδείξεις θέρμανσης: χωρίς καταχώρηση (0) για{" "}
-          {preview.statement.missingHeatingReadingLabels.join(", ")}.{" "}
+          {preview.statement.missingHeatingReadingLabels.join(", ")}. Η
+          οριστικοποίηση με έξοδα θέρμανσης απαιτεί ενδείξεις.{" "}
           <Link href={`/buildings/${id}/meters`} className="underline">
             Επεξεργασία ενδείξεων
           </Link>

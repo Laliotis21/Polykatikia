@@ -186,7 +186,7 @@ describe("buildKoinoxristaStatement", () => {
     ).toThrow(KoinoxristaError);
   });
 
-  it("falls back to heatingShareBps when no meter map", () => {
+  it("falls back to heatingShareBps when FIXED_SHARES (ignores meter map)", () => {
     const statement = buildKoinoxristaStatement({
       apartments,
       expenses: [
@@ -199,6 +199,14 @@ describe("buildKoinoxristaStatement", () => {
           categoryCode: "HEATING",
         },
       ],
+      heatingAllocation: "FIXED_SHARES",
+      // Present but ignored in FIXED_SHARES mode.
+      heatingMeterUnitsByApartmentId: new Map([
+        ["a1", 5],
+        ["a2", 20],
+        ["b1", 50],
+        ["b2", 10],
+      ]),
     });
     expect(statement.heatingAllocationMode).toBe("FIXED_SHARES");
     expect(statement.missingHeatingReadingLabels).toEqual([]);
@@ -208,7 +216,7 @@ describe("buildKoinoxristaStatement", () => {
     ).toEqual([2500, 2500, 3000, 2000]);
   });
 
-  it("allocates heating by pure consumption units when meter map present", () => {
+  it("allocates heating by pure consumption units when METER_READINGS", () => {
     // Demo weights: 5, 20, 50, 10 → sum 85. 8500 cents → Hamilton.
     const meters = new Map([
       ["a1", 5],
@@ -229,10 +237,11 @@ describe("buildKoinoxristaStatement", () => {
           categoryCode: "HEATING",
         },
       ],
+      heatingAllocation: "METER_READINGS",
       heatingMeterUnitsByApartmentId: meters,
     });
 
-    expect(statement.heatingAllocationMode).toBe("METER_UNITS");
+    expect(statement.heatingAllocationMode).toBe("METER_READINGS");
     expect(statement.missingHeatingReadingLabels).toEqual([]);
     const parts = allocateByWeights(amountCents, [5, 20, 50, 10]);
     expect(parts.reduce((a, b) => a + b, 0)).toBe(amountCents);
@@ -266,10 +275,11 @@ describe("buildKoinoxristaStatement", () => {
           categoryCode: "HEATING",
         },
       ],
+      heatingAllocation: "METER_READINGS",
       heatingMeterUnitsByApartmentId: meters,
     });
 
-    expect(statement.heatingAllocationMode).toBe("METER_UNITS");
+    expect(statement.heatingAllocationMode).toBe("METER_READINGS");
     expect(statement.missingHeatingReadingLabels.sort()).toEqual(["Α2", "Β2"]);
     const byId = Object.fromEntries(
       statement.apartmentStatements.map((s) => [s.apartmentId, s.totalCents]),
@@ -298,6 +308,7 @@ describe("buildKoinoxristaStatement", () => {
           categoryCode: "HEATING",
         },
       ],
+      heatingAllocation: "METER_READINGS",
       heatingMeterUnitsByApartmentId: meters,
     });
     const a2 = statement.apartmentStatements.find((s) => s.apartmentId === "a2")!;
@@ -307,6 +318,26 @@ describe("buildKoinoxristaStatement", () => {
         .filter((s) => s.apartmentId !== "a2")
         .every((s) => s.totalCents === 0),
     ).toBe(true);
+  });
+
+  it("throws MSG_MISSING_HEATING_READINGS when METER_READINGS and empty weights", () => {
+    expect(() =>
+      buildKoinoxristaStatement({
+        apartments,
+        expenses: [
+          {
+            id: "h1",
+            amountCents: 1000,
+            categoryId: "cat-heat",
+            allocationMethod: "HEATING_SHARES",
+            categoryName: "Θέρμανση",
+            categoryCode: "HEATING",
+          },
+        ],
+        heatingAllocation: "METER_READINGS",
+        heatingMeterUnitsByApartmentId: new Map(),
+      }),
+    ).toThrow(KoinoxristaError);
   });
 });
 

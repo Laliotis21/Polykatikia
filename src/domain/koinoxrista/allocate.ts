@@ -1,5 +1,9 @@
 import { assertCents } from "@/domain/money";
-import { KoinoxristaError, MSG_ZERO_WEIGHTS } from "./errors";
+import {
+  KoinoxristaError,
+  MSG_MISSING_HEATING_READINGS,
+  MSG_ZERO_WEIGHTS,
+} from "./errors";
 
 export type AllocationMethod =
   | "GENERAL_SHARES"
@@ -43,8 +47,8 @@ export type ApartmentStatement = {
   lines: AllocatedLine[];
 };
 
-/** How HEATING_SHARES expenses were weighted for this statement. */
-export type HeatingAllocationMode = "FIXED_SHARES" | "METER_UNITS";
+/** How HEATING_SHARES expenses were weighted for this statement (mirrors Building.heatingAllocation). */
+export type HeatingAllocationMode = "FIXED_SHARES" | "METER_READINGS";
 
 export type KoinoxristaStatement = {
   totalExpenseCents: number;
@@ -52,11 +56,11 @@ export type KoinoxristaStatement = {
   skippedUncategorizedCents: number;
   apartmentStatements: ApartmentStatement[];
   lines: AllocatedLine[];
-  /** FIXED_SHARES = heatingShareBps; METER_UNITS = period consumption weights. */
+  /** FIXED_SHARES = heatingShareBps; METER_READINGS = period consumption weights. */
   heatingAllocationMode: HeatingAllocationMode;
   /**
-   * Apartment labels with heatingShareBps > 0 but no meter reading row
-   * when meter mode is active (treated as 0 consumption). Empty in FIXED_SHARES.
+   * Apartment labels with no meter reading row when meter mode is active
+   * (treated as 0 consumption). Empty in FIXED_SHARES.
    */
   missingHeatingReadingLabels: string[];
 };
@@ -110,8 +114,9 @@ export function allocateByWeights(
 
 export type SharesForMethodOptions = {
   /**
-   * When set (meter mode for the period), HEATING_SHARES uses these integer units.
-   * Missing apartment id → 0. Omit / undefined → fall back to heatingShareBps.
+   * When set (building heatingAllocation = METER_READINGS), HEATING_SHARES uses
+   * these integer units. Missing apartment id → 0.
+   * Omit / undefined / null → use heatingShareBps (FIXED_SHARES).
    */
   heatingMeterUnitsByApartmentId?: ReadonlyMap<string, number> | null;
 };
@@ -155,28 +160,34 @@ function bucketKey(categoryId: string | null, method: AllocationMethod): BucketK
  * Build a monthly κοινόχρηστα statement from EXPENSE rows + apartment χιλιοστά.
  * MANUAL and uncategorized expenses are skipped (counted in skip totals).
  *
- * Heating demo formula:
- * - If `heatingMeterUnitsByApartmentId` is provided (any readings for period),
- *   HEATING_SHARES expenses allocate by **pure consumption units** via
- *   allocateByWeights (Hamilton / largest-remainder). Missing apt → 0.
- * - Otherwise fall back to static heatingShareBps.
+ * Heating allocation is driven by building config (`heatingAllocation`), not by
+ * whether readings happen to exist:
+ * - FIXED_SHARES → heatingShareBps (meter map ignored).
+ * - METER_READINGS → pure consumption units via allocateByWeights
+ *   (missing apt → 0). Empty / all-zero weights → MSG_ZERO_WEIGHTS when heating
+ *   expense amount > 0.
  */
 export function buildKoinoxristaStatement(input: {
   apartments: ApartmentShares[];
   expenses: ExpenseForAllocation[];
-  /** Non-null map activates meter mode for HEATING_SHARES (even if some units are 0). */
+  /**
+   * Building-level mode. Defaults to FIXED_SHARES when omitted.
+   * METER_READINGS activates meter weights even if the map is empty.
+   */
+  heatingAllocation?: HeatingAllocationMode;
+  /** Period meter units; only used when heatingAllocation = METER_READINGS. */
   heatingMeterUnitsByApartmentId?: ReadonlyMap<string, number> | null;
 }): KoinoxristaStatement {
   const { apartments, expenses } = input;
-  const meterMap = input.heatingMeterUnitsByApartmentId ?? null;
-  const heatingAllocationMode: HeatingAllocationMode = meterMap
-    ? "METER_UNITS"
-    : "FIXED_SHARES";
+  const heatingAllocationMode: HeatingAllocationMode =
+    input.heatingAllocation ?? "FIXED_SHARES";
+  const meterMap =
+    heatingAllocationMode === "METER_READINGS"
+      ? (input.heatingMeterUnitsByApartmentId ?? new Map<string, number>())
+      : null;
   const missingHeatingReadingLabels =
     meterMap != null
-      ? apartments
-          .filter((a) => a.heatingShareBps > 0 && !meterMap.has(a.id))
-          .map((a) => a.label)
+      ? apartments.filter((a) => !meterMap.has(a.id)).map((a) => a.label)
       : [];
 
   if (apartments.length === 0) {
@@ -248,8 +259,16 @@ export function buildKoinoxristaStatement(input: {
         shareOpts,
       ),
     );
-    const parts = allocateByWeights(bucket.amountCents, weights);
     const weightSum = weights.reduce((a, b) => a + b, 0);
+    if (
+      weightSum === 0 &&
+      bucket.amountCents > 0 &&
+      bucket.allocationMethod === "HEATING_SHARES" &&
+      meterMap != null
+    ) {
+      throw new KoinoxristaError(MSG_MISSING_HEATING_READINGS, 400);
+    }
+    const parts = allocateByWeights(bucket.amountCents, weights);
 
     apartments.forEach((apt, i) => {
       const amountCents = parts[i]!;

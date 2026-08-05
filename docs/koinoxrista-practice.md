@@ -22,11 +22,22 @@ Internal summary guiding Polykatikia allocation. Practice varies by **κανον
 | Cleaning, common electricity/water, management, insurance, general repairs | Γενικά χιλιοστά | `GENERAL_SHARES` |
 | Elevator operating / maintenance | Χιλιοστά ανελκυστήρα (floor-weighted; GF often 0 for ops) | `ELEVATOR_SHARES` |
 | Elevator replacement / capital works | Often γενικά or ownership shares per κανονισμός | configurable |
-| Central heating (no autonomy meters) | Χιλιοστά θέρμανσης (ΠΔ 27-09-1985 study) | `HEATING_SHARES` |
-| Heating with autonomy (ωρομέτρηση / θερμιδομέτρηση) | Period **meter units** (demo) or fixed ei/fi × hours | `HEATING_SHARES` + `HeatingMeterReading` when present |
+| Central heating (no autonomy meters) | Χιλιοστά θέρμανσης (ΠΔ 27-09-1985 study) | `HEATING_SHARES` + Building `heatingAllocation = FIXED_SHARES` |
+| Heating with autonomy (ωρομέτρηση / θερμιδομέτρηση) | Period **meter units** | `HEATING_SHARES` + Building `heatingAllocation = METER_READINGS` + `HeatingMeterReading` |
 | Hot water / shared boiler | Own key or heating / general | configurable |
 | Equal split (rare, if κανονισμός says so) | 1/N | `EQUAL` |
 | Manual / one-off assignment | Operator assigns | `MANUAL` (excluded from auto period allocation) |
+
+## Heating allocation mode (Building config)
+
+`Building.heatingAllocation`:
+
+| Value | Meaning |
+|-------|---------|
+| `FIXED_SHARES` (default) | HEATING_SHARES → static `heatingShareBps`. Meter UI hidden; readings ignored. |
+| `METER_READINGS` | HEATING_SHARES → period `HeatingMeterReading.units` (missing apt → 0). Nav shows «Ενδείξεις». Finalize blocked if heating expense exists and period has no readings. |
+
+Set at building create/edit (`/buildings`), not inferred from whether readings exist.
 
 ## Heating meter readings (ενδείξεις) — demo v1
 
@@ -34,17 +45,18 @@ Model: `HeatingMeterReading` — `(apartmentId, year, month)` unique, `units` in
 
 **Allocation rule for `HEATING_SHARES` expenses:**
 
-1. If **any** reading exists for `buildingId + year + month` → **pure consumption weights**:
+1. If building `heatingAllocation = METER_READINGS` → **pure consumption weights**:
    - weight(apartment) = `units` (missing row → **0**).
    - Split expense cents with `allocateByWeights` (Hamilton / largest-remainder).
    - Apartment with `units = 0` gets €0 of that heating bucket.
-2. Else → fall back to static `heatingShareBps` (πίνακας χιλιοστών).
+   - No readings + positive heating expense → finalize **blocked** (`MSG_MISSING_HEATING_READINGS`); preview soft-skips heating with warning.
+2. If `FIXED_SHARES` → static `heatingShareBps` (πίνακας χιλιοστών); readings ignored.
 
-Optional later: blend fixed shares × meters (κανονισμός ei/fi). Demo prefers pure meters when present.
+Optional later: blend fixed shares × meters (κανονισμός ei/fi).
 
-UI: `/buildings/[id]/meters` · API: `GET|PUT /api/buildings/[id]/meter-readings?year=&month=`.
+UI: `/buildings/[id]/meters` (only when METER_READINGS) · API: `GET|PUT /api/buildings/[id]/meter-readings?year=&month=`.
 
-Seed (Κολωνάκι, Ιαν 2026): Α1=5, Α2=20, Β1=50, Β2=10 + heating expense `seed-tx-heating-jan-2026` (125 000 ¢).
+Seed (Κολωνάκι, `heatingAllocation = METER_READINGS`, Ιαν 2026): Α1=5, Α2=20, Β1=50, Β2=10 + heating expense `seed-tx-heating-jan-2026` (125 000 ¢). Other seed buildings default `FIXED_SHARES`.
 
 ## Who pays
 

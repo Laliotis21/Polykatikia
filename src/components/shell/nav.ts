@@ -90,18 +90,70 @@ export function resolveBuildingId(pathname: string): string {
 /**
  * When switching buildings on a scoped route, keep the same leaf
  * (`/expenses`, `/koinoxrista`, `/shares`); otherwise go to expenses.
+ * Meters leaf falls back to expenses when the target building has no meters.
  */
 export function buildingScopedHref(
   pathname: string,
   buildingId: string,
+  opts?: { targetUsesMeters?: boolean },
 ): string {
   const leaf = pathname.match(
     /^\/buildings\/[^/]+\/(expenses|koinoxrista|shares|collections|meters)/,
   )?.[1];
+  if (leaf === "meters" && opts?.targetUsesMeters === false) {
+    return `/buildings/${buildingId}/expenses`;
+  }
   return `/buildings/${buildingId}/${leaf ?? "expenses"}`;
 }
 
-export function navGroups(buildingId: string): NavGroup[] {
+export function navGroups(
+  buildingId: string,
+  opts?: { showMeters?: boolean },
+): NavGroup[] {
+  const showMeters = opts?.showMeters ?? true;
+  const buildingItems: NavItem[] = [
+    {
+      href: "/buildings",
+      label: "Κτίρια",
+      icon: Building2,
+      isActive: (p) => p === "/buildings",
+    },
+    {
+      href: `/buildings/${buildingId}/expenses`,
+      label: "Έξοδα",
+      icon: ReceiptText,
+      isActive: (p) => p.endsWith("/expenses"),
+    },
+    {
+      href: `/buildings/${buildingId}/koinoxrista`,
+      label: "Κοινόχρηστα",
+      icon: Calculator,
+      isActive: (p) => p.endsWith("/koinoxrista"),
+    },
+    ...(showMeters
+      ? [
+          {
+            href: `/buildings/${buildingId}/meters`,
+            label: "Ενδείξεις",
+            icon: Gauge,
+            isActive: (p: string) => p.endsWith("/meters"),
+          } satisfies NavItem,
+        ]
+      : []),
+    {
+      href: `/buildings/${buildingId}/collections`,
+      label: "Εισπράξεις",
+      icon: Wallet,
+      isActive: (p) => p.endsWith("/collections"),
+    },
+    {
+      href: `/buildings/${buildingId}/shares`,
+      label: "Χιλιοστά",
+      icon: Scale,
+      isActive: (p) => p.endsWith("/shares"),
+    },
+  ];
+
   return [
     {
       label: "Λειτουργία",
@@ -128,44 +180,7 @@ export function navGroups(buildingId: string): NavGroup[] {
     },
     {
       label: "Κτίριο",
-      items: [
-        {
-          href: "/buildings",
-          label: "Κτίρια",
-          icon: Building2,
-          isActive: (p) => p === "/buildings",
-        },
-        {
-          href: `/buildings/${buildingId}/expenses`,
-          label: "Έξοδα",
-          icon: ReceiptText,
-          isActive: (p) => p.endsWith("/expenses"),
-        },
-        {
-          href: `/buildings/${buildingId}/koinoxrista`,
-          label: "Κοινόχρηστα",
-          icon: Calculator,
-          isActive: (p) => p.endsWith("/koinoxrista"),
-        },
-        {
-          href: `/buildings/${buildingId}/meters`,
-          label: "Ενδείξεις",
-          icon: Gauge,
-          isActive: (p) => p.endsWith("/meters"),
-        },
-        {
-          href: `/buildings/${buildingId}/collections`,
-          label: "Εισπράξεις",
-          icon: Wallet,
-          isActive: (p) => p.endsWith("/collections"),
-        },
-        {
-          href: `/buildings/${buildingId}/shares`,
-          label: "Χιλιοστά",
-          icon: Scale,
-          isActive: (p) => p.endsWith("/shares"),
-        },
-      ],
+      items: buildingItems,
     },
   ];
 }

@@ -20,3 +20,6 @@ export const MSG_ALREADY_FINALIZED =
 
 export const MSG_ZERO_WEIGHTS =
   "Δεν μπορούν να επιμεριστούν έξοδα: όλα τα χιλιοστά είναι μηδέν / Cannot allocate: all share weights are zero";
+
+export const MSG_MISSING_HEATING_READINGS =
+  "Το κτίριο χρησιμοποιεί μετρητές θέρμανσης· καταχωρήστε ενδείξεις για την περίοδο / Building uses heating meters; enter period readings before allocating heating";

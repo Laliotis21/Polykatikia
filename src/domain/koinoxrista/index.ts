@@ -18,7 +18,12 @@ export {
   KoinoxristaError,
   MSG_ALREADY_FINALIZED,
   MSG_EMPTY_FINALIZE,
+  MSG_MISSING_HEATING_READINGS,
   MSG_ZERO_WEIGHTS,
 } from "./errors";
 export { mapKoinoxristaHttpError } from "./http";
-export { finalizeKoinoxristaSettlement, previewKoinoxrista } from "./settle";
+export {
+  assertHeatingReadingsForFinalize,
+  finalizeKoinoxristaSettlement,
+  previewKoinoxrista,
+} from "./settle";

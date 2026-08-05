@@ -11,9 +11,12 @@ import { appendAuditLog } from "@/domain/audit";
 
 export const runtime = "nodejs";
 
+const heatingAllocationSchema = z.enum(["FIXED_SHARES", "METER_READINGS"]);
+
 const createSchema = z.object({
   name: z.string().trim().min(1).max(120),
   address: z.string().trim().max(240).nullable().optional(),
+  heatingAllocation: heatingAllocationSchema.optional(),
 });
 
 const patchSchema = z
@@ -21,10 +24,24 @@ const patchSchema = z
     id: z.string().min(1),
     name: z.string().trim().min(1).max(120).optional(),
     address: z.string().trim().max(240).nullable().optional(),
+    heatingAllocation: heatingAllocationSchema.optional(),
   })
-  .refine((b) => b.name !== undefined || b.address !== undefined, {
-    message: "At least one of name or address is required",
-  });
+  .refine(
+    (b) =>
+      b.name !== undefined ||
+      b.address !== undefined ||
+      b.heatingAllocation !== undefined,
+    {
+      message: "At least one of name, address, or heatingAllocation is required",
+    },
+  );
+
+const buildingSelect = {
+  id: true,
+  name: true,
+  address: true,
+  heatingAllocation: true,
+} as const;
 
 /**
  * GET /api/buildings
@@ -35,7 +52,7 @@ export async function GET() {
     requireViewer(await getSessionUser());
     const buildings = await prisma.building.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true, address: true },
+      select: buildingSelect,
     });
     return NextResponse.json({ buildings });
   } catch (err) {
@@ -49,7 +66,7 @@ export async function GET() {
 
 /**
  * POST /api/buildings
- * Create building (name + optional address). OPERATOR+.
+ * Create building (name + optional address + heatingAllocation). OPERATOR+.
  */
 export async function POST(request: Request) {
   try {
@@ -67,8 +84,9 @@ export async function POST(request: Request) {
       data: {
         name: parsed.data.name,
         address: parsed.data.address ?? null,
+        heatingAllocation: parsed.data.heatingAllocation ?? "FIXED_SHARES",
       },
-      select: { id: true, name: true, address: true },
+      select: buildingSelect,
     });
 
     await appendAuditLog({
@@ -91,7 +109,7 @@ export async function POST(request: Request) {
 
 /**
  * PATCH /api/buildings
- * Update building name/address. OPERATOR+.
+ * Update building name/address/heatingAllocation. OPERATOR+.
  */
 export async function PATCH(request: Request) {
   try {
@@ -107,7 +125,7 @@ export async function PATCH(request: Request) {
 
     const existing = await prisma.building.findUnique({
       where: { id: parsed.data.id },
-      select: { id: true, name: true, address: true },
+      select: buildingSelect,
     });
     if (!existing) {
       return NextResponse.json({ error: "Building not found" }, { status: 404 });
@@ -120,8 +138,11 @@ export async function PATCH(request: Request) {
         ...(parsed.data.address !== undefined
           ? { address: parsed.data.address }
           : {}),
+        ...(parsed.data.heatingAllocation !== undefined
+          ? { heatingAllocation: parsed.data.heatingAllocation }
+          : {}),
       },
-      select: { id: true, name: true, address: true },
+      select: buildingSelect,
     });
 
     await appendAuditLog({

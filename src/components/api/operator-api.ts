@@ -32,31 +32,37 @@ export const SEED_BUILDINGS: BuildingSummary[] = [
     id: "seed-building-kolonaki",
     name: "Κολωνάκι 12",
     address: "Σκουφά 12, Αθήνα",
+    heatingAllocation: "METER_READINGS",
   },
   {
     id: "seed-building-pangrati",
     name: "Παγκράτι 8",
     address: "Υμηττού 8, Αθήνα",
+    heatingAllocation: "FIXED_SHARES",
   },
   {
     id: "seed-building-kypseli",
     name: "Κυψέλη 22",
     address: "Πατησίων 22, Αθήνα",
+    heatingAllocation: "FIXED_SHARES",
   },
   {
     id: "seed-building-glyfada",
     name: "Γλυφάδα 5",
     address: "Γρ. Λαμπράκη 5, Γλυφάδα",
+    heatingAllocation: "FIXED_SHARES",
   },
   {
     id: "seed-building-thessaloniki",
     name: "Θεσσαλονίκη — Τσιμισκή 40",
     address: "Τσιμισκή 40, Θεσσαλονίκη",
+    heatingAllocation: "FIXED_SHARES",
   },
   {
     id: "seed-building-patra",
     name: "Πάτρα — Ρήγα Φεραίου 15",
     address: "Ρήγα Φεραίου 15, Πάτρα",
+    heatingAllocation: "FIXED_SHARES",
   },
 ];
 
@@ -169,6 +175,7 @@ export async function fetchBuildings(): Promise<ApiResult<BuildingSummary[]>> {
 export async function createBuilding(body: {
   name: string;
   address?: string | null;
+  heatingAllocation?: "FIXED_SHARES" | "METER_READINGS";
 }): Promise<ApiResult<BuildingSummary | null>> {
   try {
     const res = await fetch("/api/buildings", {
@@ -198,6 +205,7 @@ export async function patchBuilding(body: {
   id: string;
   name?: string;
   address?: string | null;
+  heatingAllocation?: "FIXED_SHARES" | "METER_READINGS";
 }): Promise<ApiResult<BuildingSummary | null>> {
   try {
     const res = await fetch("/api/buildings", {

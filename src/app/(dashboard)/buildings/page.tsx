@@ -38,6 +38,9 @@ export default function BuildingsPage() {
 
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
+  const [heatingAllocation, setHeatingAllocation] = useState<
+    "FIXED_SHARES" | "METER_READINGS"
+  >("FIXED_SHARES");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -55,6 +58,7 @@ export default function BuildingsPage() {
     setEditingId(b.id);
     setName(b.name);
     setAddress(b.address ?? "");
+    setHeatingAllocation(b.heatingAllocation ?? "FIXED_SHARES");
     setError(null);
     setStatus(null);
   }
@@ -63,6 +67,7 @@ export default function BuildingsPage() {
     setEditingId(null);
     setName("");
     setAddress("");
+    setHeatingAllocation("FIXED_SHARES");
   }
 
   function submit() {
@@ -76,6 +81,7 @@ export default function BuildingsPage() {
     const payload = {
       name: trimmedName,
       address: address.trim() === "" ? null : address.trim(),
+      heatingAllocation,
     };
 
     startTransition(async () => {
@@ -132,7 +138,7 @@ export default function BuildingsPage() {
 
       <Section
         title={editingId ? "Επεξεργασία κτιρίου" : "Νέο κτίριο"}
-        description="Όνομα και διεύθυνση. Διαμερίσματα & χιλιοστά ορίζονται στο Χιλιοστά του ενεργού κτιρίου."
+        description="Όνομα, διεύθυνση και τρόπος κατανομής θέρμανσης. Διαμερίσματα & χιλιοστά ορίζονται στο Χιλιοστά του ενεργού κτιρίου."
         order={0}
       >
         <form
@@ -167,6 +173,48 @@ export default function BuildingsPage() {
               maxLength={240}
             />
           </Field>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium text-ink">
+              Κατανομή θέρμανσης
+            </legend>
+            <p className="text-sm text-ink-muted">
+              Ορίζεται με το χτίσιμο του κτιρίου (όχι από το αν υπάρχουν ενδείξεις).
+            </p>
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border-soft px-3 py-2.5">
+              <input
+                type="radio"
+                name={`${formId}-heating`}
+                className="mt-1"
+                checked={heatingAllocation === "FIXED_SHARES"}
+                onChange={() => setHeatingAllocation("FIXED_SHARES")}
+              />
+              <span>
+                <span className="block text-sm font-medium text-ink">
+                  Σταθερά χιλιοστά θέρμανσης
+                </span>
+                <span className="block text-sm text-ink-muted">
+                  Κατανομή από τον πίνακα χιλιοστών (χωρίς μετρητές).
+                </span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border-soft px-3 py-2.5">
+              <input
+                type="radio"
+                name={`${formId}-heating`}
+                className="mt-1"
+                checked={heatingAllocation === "METER_READINGS"}
+                onChange={() => setHeatingAllocation("METER_READINGS")}
+              />
+              <span>
+                <span className="block text-sm font-medium text-ink">
+                  Θέρμανση με μετρητές / ενδείξεις
+                </span>
+                <span className="block text-sm text-ink-muted">
+                  Αυτονομία — περίοδος ενδείξεων (ωρομέτρηση / μονάδες).
+                </span>
+              </span>
+            </label>
+          </fieldset>
           <div className="flex flex-wrap gap-3">
             <Button type="submit" loading={isPending}>
               {editingId ? (
@@ -216,6 +264,12 @@ export default function BuildingsPage() {
                   <p className="font-display font-bold text-ink">{b.name}</p>
                   <p className="text-sm text-ink-muted">
                     {b.address ?? "Χωρίς διεύθυνση"}
+                  </p>
+                  <p className="mt-1 text-xs text-ink-subtle">
+                    Θέρμανση:{" "}
+                    {b.heatingAllocation === "METER_READINGS"
+                      ? "μετρητές / ενδείξεις"
+                      : "σταθερά χιλιοστά"}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

@@ -6,10 +6,13 @@ import { usePathname } from "next/navigation";
 import { BrandLockup } from "@/components/shell/Brand";
 import { BuildingSelector } from "@/components/shell/BuildingSelector";
 import {
+  BUILDINGS_CHANGED_EVENT,
+  BUILDING_SELECTION_EVENT,
   navGroups,
   resolveBuildingId,
   writeStoredBuildingId,
 } from "@/components/shell/nav";
+import { fetchBuildings } from "@/components/api/operator-api";
 import { cn } from "@/lib/cn";
 
 type SidebarProps = {
@@ -26,6 +29,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const [buildingId, setBuildingId] = useState(() =>
     resolveBuildingId(pathname),
   );
+  const [showMeters, setShowMeters] = useState(true);
 
   useEffect(() => {
     const next = resolveBuildingId(pathname);
@@ -33,7 +37,34 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     writeStoredBuildingId(next);
   }, [pathname]);
 
-  const groups = navGroups(buildingId);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadHeatingMode() {
+      const result = await fetchBuildings();
+      if (cancelled) return;
+      const match = result.data.find((b) => b.id === buildingId);
+      if (match) {
+        setShowMeters(match.heatingAllocation === "METER_READINGS");
+      } else {
+        // Fallback until API responds: Kolonaki uses meters; others fixed.
+        setShowMeters(buildingId === "seed-building-kolonaki");
+      }
+    }
+    void loadHeatingMode();
+
+    function onRefresh() {
+      void loadHeatingMode();
+    }
+    window.addEventListener(BUILDINGS_CHANGED_EVENT, onRefresh);
+    window.addEventListener(BUILDING_SELECTION_EVENT, onRefresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(BUILDINGS_CHANGED_EVENT, onRefresh);
+      window.removeEventListener(BUILDING_SELECTION_EVENT, onRefresh);
+    };
+  }, [buildingId]);
+
+  const groups = navGroups(buildingId, { showMeters });
 
   return (
     <div className="flex h-full flex-col">

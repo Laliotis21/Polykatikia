@@ -56,6 +56,8 @@ type BuildingSpec = {
   owners: OwnerSpec[];
   /** Slight per-building amount offset so totals differ in UI. */
   amountOffsetCents: number;
+  /** Default FIXED_SHARES; Kolonaki demo uses METER_READINGS. */
+  heatingAllocation?: "FIXED_SHARES" | "METER_READINGS";
 };
 
 const KOLONAKI: BuildingSpec = {
@@ -63,6 +65,7 @@ const KOLONAKI: BuildingSpec = {
   name: "Κολωνάκι 12",
   address: "Σκουφά 12, Αθήνα",
   amountOffsetCents: 0,
+  heatingAllocation: "METER_READINGS",
   apartments: [
     {
       id: "seed-apt-a1",
@@ -636,11 +639,13 @@ async function seedBuildingStructure(
     update: {
       name: building.name,
       address: building.address,
+      heatingAllocation: building.heatingAllocation ?? "FIXED_SHARES",
     },
     create: {
       id: building.id,
       name: building.name,
       address: building.address,
+      heatingAllocation: building.heatingAllocation ?? "FIXED_SHARES",
     },
   });
 
@@ -783,8 +788,9 @@ async function seedBuildingYear(
       });
     }
 
-    // Kolonaki Jan: varied meter readings so heating allocates by consumption.
-    if (building.id === KOLONAKI.id && month === 1) {
+    // Kolonaki heating months: meter readings so METER_READINGS allocate by consumption.
+    // Jan keeps the documented demo weights; other heating months reuse the same pattern.
+    if (building.id === KOLONAKI.id && isHeatingMonth(month)) {
       const janReadings: Array<{ apartmentId: string; units: number }> = [
         { apartmentId: "seed-apt-a1", units: 5 },
         { apartmentId: "seed-apt-a2", units: 20 },
@@ -797,16 +803,16 @@ async function seedBuildingYear(
             apartmentId_year_month: {
               apartmentId: row.apartmentId,
               year: DEMO_YEAR,
-              month: 1,
+              month,
             },
           },
           update: { units: row.units, buildingId: building.id },
           create: {
-            id: `seed-heat-read-${row.apartmentId}-2026-01`,
+            id: `seed-heat-read-${row.apartmentId}-${DEMO_YEAR}-${monthSlug(month)}`,
             buildingId: building.id,
             apartmentId: row.apartmentId,
             year: DEMO_YEAR,
-            month: 1,
+            month,
             units: row.units,
           },
         });

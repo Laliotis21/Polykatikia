@@ -1,5 +1,6 @@
 import type {
   AllocationMethod,
+  HeatingAllocation,
   Prisma,
   PrismaClient,
   SettlementStatus,
@@ -9,12 +10,14 @@ import {
   athensLocalToUtc,
   buildKoinoxristaStatement,
   monthAthensRange,
+  type HeatingAllocationMode,
   type KoinoxristaStatement,
 } from "./allocate";
 import {
   KoinoxristaError,
   MSG_ALREADY_FINALIZED,
   MSG_EMPTY_FINALIZE,
+  MSG_MISSING_HEATING_READINGS,
 } from "./errors";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
@@ -25,6 +28,7 @@ export type PreviewKoinoxristaResult = {
   month: number;
   from: string;
   to: string;
+  heatingAllocation: HeatingAllocationMode;
   existingSettlement: {
     id: string;
     status: SettlementStatus;
@@ -34,6 +38,24 @@ export type PreviewKoinoxristaResult = {
   statement: KoinoxristaStatement;
 };
 
+/**
+ * Block finalize when building requires meters but period has no readings
+ * and there is a positive HEATING_SHARES expense to allocate.
+ */
+export function assertHeatingReadingsForFinalize(input: {
+  heatingAllocation: HeatingAllocation | HeatingAllocationMode;
+  hasHeatingExpense: boolean;
+  meterRowCount: number;
+}): void {
+  if (
+    input.heatingAllocation === "METER_READINGS" &&
+    input.hasHeatingExpense &&
+    input.meterRowCount === 0
+  ) {
+    throw new KoinoxristaError(MSG_MISSING_HEATING_READINGS, 400);
+  }
+}
+
 async function loadPeriodInputs(
   db: DbClient,
   input: { buildingId: string; year: number; month: number },
@@ -41,74 +63,108 @@ async function loadPeriodInputs(
   const { buildingId, year, month } = input;
   const { from, to } = monthAthensRange(year, month);
 
-  const [apartments, expenses, existing, meterRows] = await Promise.all([
-    db.apartment.findMany({
-      where: { buildingId },
-      orderBy: { label: "asc" },
-      select: {
-        id: true,
-        label: true,
-        shareBps: true,
-        elevatorShareBps: true,
-        heatingShareBps: true,
-      },
-    }),
-    db.transaction.findMany({
-      where: {
-        buildingId,
-        type: "EXPENSE",
-        occurredAt: { gte: from, lt: to },
-      },
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            allocationMethod: true,
+  const [building, apartments, expenses, existing, meterRows] =
+    await Promise.all([
+      db.building.findUniqueOrThrow({
+        where: { id: buildingId },
+        select: { heatingAllocation: true },
+      }),
+      db.apartment.findMany({
+        where: { buildingId },
+        orderBy: { label: "asc" },
+        select: {
+          id: true,
+          label: true,
+          shareBps: true,
+          elevatorShareBps: true,
+          heatingShareBps: true,
+        },
+      }),
+      db.transaction.findMany({
+        where: {
+          buildingId,
+          type: "EXPENSE",
+          occurredAt: { gte: from, lt: to },
+        },
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              allocationMethod: true,
+            },
           },
         },
-      },
-      orderBy: { occurredAt: "asc" },
-    }),
-    db.commonExpenseSettlement.findUnique({
-      where: {
-        buildingId_year_month: { buildingId, year, month },
-      },
-      select: {
-        id: true,
-        status: true,
-        totalCents: true,
-        finalizedAt: true,
-      },
-    }),
-    db.heatingMeterReading.findMany({
-      where: { buildingId, year, month },
-      select: { apartmentId: true, units: true },
-    }),
-  ]);
+        orderBy: { occurredAt: "asc" },
+      }),
+      db.commonExpenseSettlement.findUnique({
+        where: {
+          buildingId_year_month: { buildingId, year, month },
+        },
+        select: {
+          id: true,
+          status: true,
+          totalCents: true,
+          finalizedAt: true,
+        },
+      }),
+      db.heatingMeterReading.findMany({
+        where: { buildingId, year, month },
+        select: { apartmentId: true, units: true },
+      }),
+    ]);
 
-  // Any reading for the period → meter mode (missing apt → 0). Else fixed heatingShareBps.
-  const heatingMeterUnitsByApartmentId =
-    meterRows.length > 0
-      ? new Map(meterRows.map((r) => [r.apartmentId, r.units]))
-      : null;
+  const heatingAllocation =
+    building.heatingAllocation as HeatingAllocationMode;
+  const usesMeters = heatingAllocation === "METER_READINGS";
 
-  const statement = buildKoinoxristaStatement({
+  // Building config drives mode — readings ignored when FIXED_SHARES.
+  const heatingMeterUnitsByApartmentId = usesMeters
+    ? new Map(meterRows.map((r) => [r.apartmentId, r.units]))
+    : null;
+
+  const mappedExpenses = expenses.map((e) => ({
+    id: e.id,
+    amountCents: e.amountCents,
+    categoryId: e.categoryId,
+    allocationMethod: (e.category?.allocationMethod ??
+      "GENERAL_SHARES") as AllocationMethod,
+    categoryName: e.category?.name ?? null,
+    categoryCode: e.category?.code ?? null,
+  }));
+
+  const hasHeatingExpense = mappedExpenses.some(
+    (e) =>
+      e.categoryId != null &&
+      e.allocationMethod === "HEATING_SHARES" &&
+      e.amountCents > 0,
+  );
+
+  return {
+    from,
+    to,
     apartments,
-    expenses: expenses.map((e) => ({
-      id: e.id,
-      amountCents: e.amountCents,
-      categoryId: e.categoryId,
-      allocationMethod: (e.category?.allocationMethod ??
-        "GENERAL_SHARES") as AllocationMethod,
-      categoryName: e.category?.name ?? null,
-      categoryCode: e.category?.code ?? null,
-    })),
+    expenses,
+    existing,
+    heatingAllocation,
+    hasHeatingExpense,
+    meterRowCount: meterRows.length,
+    mappedExpenses,
     heatingMeterUnitsByApartmentId,
-  });
+  };
+}
 
-  return { from, to, apartments, expenses, existing, statement };
+function buildStatementFromLoaded(
+  loaded: Awaited<ReturnType<typeof loadPeriodInputs>>,
+  expenses = loaded.mappedExpenses,
+): KoinoxristaStatement {
+  return buildKoinoxristaStatement({
+    apartments: loaded.apartments,
+    expenses,
+    heatingAllocation: loaded.heatingAllocation,
+    heatingMeterUnitsByApartmentId: loaded.heatingMeterUnitsByApartmentId,
+  });
 }
 
 export async function previewKoinoxrista(
@@ -116,20 +172,41 @@ export async function previewKoinoxrista(
   input: { buildingId: string; year: number; month: number },
 ): Promise<PreviewKoinoxristaResult> {
   const { buildingId, year, month } = input;
-  const { from, to, existing, statement } = await loadPeriodInputs(db, input);
+  const loaded = await loadPeriodInputs(db, input);
+
+  let statement: KoinoxristaStatement;
+  try {
+    statement = buildStatementFromLoaded(loaded);
+  } catch (err) {
+    // Draft preview with warning: allocate non-heating buckets when meters missing.
+    if (
+      err instanceof KoinoxristaError &&
+      err.message === MSG_MISSING_HEATING_READINGS
+    ) {
+      statement = buildStatementFromLoaded(
+        loaded,
+        loaded.mappedExpenses.filter(
+          (e) => e.allocationMethod !== "HEATING_SHARES",
+        ),
+      );
+    } else {
+      throw err;
+    }
+  }
 
   return {
     buildingId,
     year,
     month,
-    from: from.toISOString(),
-    to: to.toISOString(),
-    existingSettlement: existing
+    from: loaded.from.toISOString(),
+    to: loaded.to.toISOString(),
+    heatingAllocation: loaded.heatingAllocation,
+    existingSettlement: loaded.existing
       ? {
-          id: existing.id,
-          status: existing.status,
-          totalCents: existing.totalCents,
-          finalizedAt: existing.finalizedAt?.toISOString() ?? null,
+          id: loaded.existing.id,
+          status: loaded.existing.status,
+          totalCents: loaded.existing.totalCents,
+          finalizedAt: loaded.existing.finalizedAt?.toISOString() ?? null,
         }
       : null,
     statement,
@@ -189,7 +266,13 @@ export async function finalizeKoinoxristaSettlement(
     }
 
     // Rebuild statement under the lock before mutating.
-    const { statement } = await loadPeriodInputs(tx, input);
+    const loaded = await loadPeriodInputs(tx, input);
+    assertHeatingReadingsForFinalize({
+      heatingAllocation: loaded.heatingAllocation,
+      hasHeatingExpense: loaded.hasHeatingExpense,
+      meterRowCount: loaded.meterRowCount,
+    });
+    const statement = buildStatementFromLoaded(loaded);
 
     const allocatable = statement.apartmentStatements.reduce(
       (sum, s) => sum + s.totalCents,

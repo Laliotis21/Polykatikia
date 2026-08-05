@@ -57,11 +57,13 @@ export async function GET(request: Request, context: RouteContext) {
 
     const building = await prisma.building.findUnique({
       where: { id: buildingId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, heatingAllocation: true },
     });
     if (!building) {
       return NextResponse.json({ error: "Building not found" }, { status: 404 });
     }
+
+    const usesMeters = building.heatingAllocation === "METER_READINGS";
 
     const [apartments, readings] = await Promise.all([
       prisma.apartment.findMany({
@@ -99,15 +101,20 @@ export async function GET(request: Request, context: RouteContext) {
       };
     });
 
-    const missingLabels = rows
-      .filter((r) => r.heatingShareBps > 0 && r.units === null)
-      .map((r) => r.label);
+    const missingLabels = usesMeters
+      ? rows.filter((r) => r.units === null).map((r) => r.label)
+      : [];
 
     return NextResponse.json({
-      building,
+      building: {
+        id: building.id,
+        name: building.name,
+        heatingAllocation: building.heatingAllocation,
+      },
       year,
       month,
       hasAnyReading: readings.length > 0,
+      usesMeters,
       missingLabels,
       rows,
     });
@@ -141,10 +148,19 @@ export async function PUT(request: Request, context: RouteContext) {
 
     const building = await prisma.building.findUnique({
       where: { id: buildingId },
-      select: { id: true },
+      select: { id: true, heatingAllocation: true },
     });
     if (!building) {
       return NextResponse.json({ error: "Building not found" }, { status: 404 });
+    }
+    if (building.heatingAllocation !== "METER_READINGS") {
+      return NextResponse.json(
+        {
+          error:
+            "Το κτίριο χρησιμοποιεί σταθερά χιλιοστά θέρμανσης· οι ενδείξεις δεν εφαρμόζονται / Building uses fixed heating shares; meter readings are not used",
+        },
+        { status: 400 },
+      );
     }
 
     const apartmentIds = [...new Set(readings.map((r) => r.apartmentId))];

@@ -55,6 +55,14 @@ enum SettlementStatus {
   FINALIZED
 }
 
+/// How HEATING_SHARES expenses are weighted for this building (set at create/config).
+enum HeatingAllocation {
+  /// Static πίνακας χιλιοστών θέρμανσης (`heatingShareBps`).
+  FIXED_SHARES
+  /// Period meter readings (`HeatingMeterReading` units).
+  METER_READINGS
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -71,11 +79,13 @@ model User {
 }
 
 model Building {
-  id        String   @id @default(cuid())
-  name      String
-  address   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String             @id @default(cuid())
+  name              String
+  address           String?
+  /// FIXED_SHARES = heatingShareBps; METER_READINGS = period ενδείξεις.
+  heatingAllocation HeatingAllocation  @default(FIXED_SHARES)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   apartments           Apartment[]
   transactions         Transaction[]
@@ -110,8 +120,8 @@ model Apartment {
 }
 
 /// Period heating consumption (ωρομέτρηση / meter units). Integer units only — no floats.
-/// When any reading exists for building+year+month, HEATING_SHARES expenses allocate by
-/// these units (missing apartment → 0). Otherwise fall back to heatingShareBps.
+/// Used for HEATING_SHARES only when Building.heatingAllocation = METER_READINGS
+/// (missing apartment → 0). Ignored when FIXED_SHARES.
 model HeatingMeterReading {
   id          String    @id @default(cuid())
   buildingId  String

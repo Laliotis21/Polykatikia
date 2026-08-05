@@ -11,6 +11,7 @@ export type BuildingSummary = {
   id: string;
   name: string;
   address: string | null;
+  heatingAllocation: "FIXED_SHARES" | "METER_READINGS";
 };
 
 export type CreateTransactionBody = {
@@ -170,9 +171,10 @@ export type KoinoxristaPreview = {
     skippedUncategorizedCents: number;
     apartmentStatements: KoinoxristaApartmentStatement[];
     lines: KoinoxristaLine[];
-    heatingAllocationMode?: "FIXED_SHARES" | "METER_UNITS";
+    heatingAllocationMode?: "FIXED_SHARES" | "METER_READINGS";
     missingHeatingReadingLabels?: string[];
   };
+  heatingAllocation?: "FIXED_SHARES" | "METER_READINGS";
 };
 
 export type MeterReadingRow = {
@@ -186,10 +188,15 @@ export type MeterReadingRow = {
 };
 
 export type MeterReadingsResponse = {
-  building: { id: string; name: string };
+  building: {
+    id: string;
+    name: string;
+    heatingAllocation: "FIXED_SHARES" | "METER_READINGS";
+  };
   year: number;
   month: number;
   hasAnyReading: boolean;
+  usesMeters: boolean;
   missingLabels: string[];
   rows: MeterReadingRow[];
 };

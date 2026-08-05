@@ -58,6 +58,7 @@ export default function MetersPage({
   const [rows, setRows] = useState<MeterReadingRow[]>([]);
   const [draftUnits, setDraftUnits] = useState<Record<string, string>>({});
   const [hasAnyReading, setHasAnyReading] = useState(false);
+  const [usesMeters, setUsesMeters] = useState(true);
   const [missingLabels, setMissingLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
@@ -80,10 +81,12 @@ export default function MetersPage({
         setRows([]);
         setDraftUnits({});
         setHasAnyReading(false);
+        setUsesMeters(false);
         setMissingLabels([]);
       } else if (result.data) {
         setRows(result.data.rows);
         setHasAnyReading(result.data.hasAnyReading);
+        setUsesMeters(result.data.usesMeters ?? true);
         setMissingLabels(result.data.missingLabels);
         setDraftUnits(
           Object.fromEntries(
@@ -159,7 +162,11 @@ export default function MetersPage({
       <PageHeader
         eyebrow={buildingName}
         title="Ενδείξεις θέρμανσης"
-        description="Κατανάλωση ανά διαμέρισμα για την περίοδο. Όταν υπάρχουν ενδείξεις, η Θέρμανση στα κοινόχρηστα μοιράζεται με βάρη κατανάλωσης (όχι μόνο σταθερά χιλιοστά)."
+        description={
+          usesMeters
+            ? "Κατανάλωση ανά διαμέρισμα για την περίοδο. Το κτίριο είναι ρυθμισμένο σε κατανομή με μετρητές — τα κοινόχρηστα θέρμανσης μοιράζονται με βάρη ενδείξεων."
+            : "Αυτό το κτίριο χρησιμοποιεί σταθερά χιλιοστά θέρμανσης. Οι ενδείξεις δεν χρησιμοποιούνται στην κατανομή — αλλάξτε τη ρύθμιση στα Κτίρια αν χρειάζεται αυτονομία."
+        }
         actions={
           <>
             <Link
@@ -180,7 +187,7 @@ export default function MetersPage({
               onClick={onSave}
               loading={isPending}
               loadingLabel="Αποθήκευση…"
-              disabled={loading || rows.length === 0}
+              disabled={loading || rows.length === 0 || !usesMeters}
             >
               <Save className="size-4" aria-hidden strokeWidth={2} />
               Αποθήκευση
@@ -220,8 +227,12 @@ export default function MetersPage({
           />
         </Field>
         <div className="flex flex-wrap items-center gap-3 pb-1">
-          <Badge tone={hasAnyReading ? "success" : "neutral"}>
-            {hasAnyReading ? "Κατανομή: ενδείξεις" : "Κατανομή: χιλιοστά θέρμανσης"}
+          <Badge tone={usesMeters ? (hasAnyReading ? "success" : "warning") : "neutral"}>
+            {usesMeters
+              ? hasAnyReading
+                ? "Κατανομή: ενδείξεις"
+                : "Λείπουν ενδείξεις"
+              : "Κτίριο: σταθερά χιλιοστά"}
           </Badge>
           <span className="text-sm text-ink-muted">
             Σύνολο μονάδων:{" "}
@@ -246,7 +257,16 @@ export default function MetersPage({
           {status}
         </p>
       ) : null}
-      {hasAnyReading && missingLabels.length > 0 ? (
+      {usesMeters && !hasAnyReading ? (
+        <p
+          role="status"
+          className="rounded-md border border-brass-200 bg-[var(--warning-soft)] px-3 py-2.5 text-sm text-[var(--warning)]"
+        >
+          Δεν υπάρχουν ενδείξεις για αυτή την περίοδο. Η οριστικοποίηση
+          κοινοχρήστων με έξοδα θέρμανσης θα απορριφθεί μέχρι να καταχωρηθούν.
+        </p>
+      ) : null}
+      {usesMeters && hasAnyReading && missingLabels.length > 0 ? (
         <p
           role="status"
           className="rounded-md border border-brass-200 bg-[var(--warning-soft)] px-3 py-2.5 text-sm text-[var(--warning)]"
