@@ -3,8 +3,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  /// Direct Postgres for migrate/introspect. App runtime uses pooled DATABASE_URL.
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
