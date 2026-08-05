@@ -2,7 +2,7 @@
 
 import { use, useEffect, useId, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Calculator, Check, Gauge, Scale, Wallet } from "lucide-react";
+import { Calculator, Check, FileDown, Gauge, Scale, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -15,6 +15,7 @@ import {
   ALLOCATION_METHOD_LABELS,
   fetchKoinoxristaPreview,
   finalizeKoinoxrista,
+  koinoxristaPdfUrl,
   SEED_BUILDINGS,
 } from "@/components/api/operator-api";
 import type { KoinoxristaPreview } from "@/lib/api-types";
@@ -131,6 +132,23 @@ export default function KoinoxristaPage({
               <Scale className="size-4" aria-hidden strokeWidth={2} />
               Χιλιοστά
             </Link>
+            <a
+              href={koinoxristaPdfUrl(id, year, month)}
+              className={cn(
+                buttonStyles("secondary"),
+                (loading || allocatableTotal <= 0) &&
+                  "pointer-events-none opacity-50",
+              )}
+              aria-disabled={loading || allocatableTotal <= 0}
+              onClick={(e) => {
+                if (loading || allocatableTotal <= 0) {
+                  e.preventDefault();
+                }
+              }}
+            >
+              <FileDown className="size-4" aria-hidden strokeWidth={2} />
+              Εξαγωγή PDF
+            </a>
             <Button
               onClick={onFinalize}
               loading={isPending}

@@ -589,6 +589,15 @@ export async function fetchKoinoxristaPreview(
   }
 }
 
+/** Download URL for multi-page κοινόχρηστα PDF (summary + per apartment). */
+export function koinoxristaPdfUrl(
+  buildingId: string,
+  year: number,
+  month: number,
+): string {
+  return `/api/buildings/${buildingId}/koinoxrista/pdf?year=${year}&month=${month}`;
+}
+
 export async function finalizeKoinoxrista(
   buildingId: string,
   year: number,
