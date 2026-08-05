@@ -19,6 +19,7 @@ import {
   MSG_EMPTY_FINALIZE,
   MSG_MISSING_HEATING_READINGS,
 } from "./errors";
+import { mintRecurringExpensesForPeriod } from "@/domain/recurring";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -169,9 +170,23 @@ function buildStatementFromLoaded(
 
 export async function previewKoinoxrista(
   db: DbClient,
-  input: { buildingId: string; year: number; month: number },
+  input: {
+    buildingId: string;
+    year: number;
+    month: number;
+    /** When set, mint missing active πάγια before building the statement. */
+    createdById?: string;
+  },
 ): Promise<PreviewKoinoxristaResult> {
   const { buildingId, year, month } = input;
+  if (input.createdById) {
+    await mintRecurringExpensesForPeriod(db, {
+      buildingId,
+      year,
+      month,
+      createdById: input.createdById,
+    });
+  }
   const loaded = await loadPeriodInputs(db, input);
 
   let statement: KoinoxristaStatement;
@@ -264,6 +279,14 @@ export async function finalizeKoinoxristaSettlement(
     if (existing?.status === "FINALIZED") {
       throw new KoinoxristaError(MSG_ALREADY_FINALIZED, 409);
     }
+
+    // Mint missing active πάγια so they appear in period expenses.
+    await mintRecurringExpensesForPeriod(tx, {
+      buildingId: input.buildingId,
+      year: input.year,
+      month: input.month,
+      createdById: input.createdById,
+    });
 
     // Rebuild statement under the lock before mutating.
     const loaded = await loadPeriodInputs(tx, input);

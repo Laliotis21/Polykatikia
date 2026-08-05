@@ -24,6 +24,10 @@ export type CreateTransactionInput = {
   description?: string | null;
   /** @deprecated Ignored — receipt amounts must equal OCR; kept for API compat. */
   mismatchJustification?: string | null;
+  /** Set when minting from a πάγιο template. */
+  recurringExpenseId?: string | null;
+  recurringPeriodYear?: number | null;
+  recurringPeriodMonth?: number | null;
   createdById: string;
 };
 
@@ -121,6 +125,9 @@ export async function createTransactionWithIntegrity(
         receiptId: input.receiptId ?? null,
         description: input.description ?? null,
         mismatchJustification: null,
+        recurringExpenseId: input.recurringExpenseId ?? null,
+        recurringPeriodYear: input.recurringPeriodYear ?? null,
+        recurringPeriodMonth: input.recurringPeriodMonth ?? null,
         createdById: input.createdById,
       },
     });

@@ -32,7 +32,7 @@ const periodSchema = z.object({
  */
 export async function GET(request: Request, context: RouteContext) {
   try {
-    requireViewer(await getSessionUser());
+    const user = requireViewer(await getSessionUser());
     const { id: buildingId } = await context.params;
 
     const building = await prisma.building.findUnique({
@@ -59,6 +59,7 @@ export async function GET(request: Request, context: RouteContext) {
       buildingId,
       year: parsed.data.year,
       month: parsed.data.month,
+      createdById: user.id,
     });
 
     return NextResponse.json({ building, ...preview });
