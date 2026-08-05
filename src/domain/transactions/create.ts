@@ -9,9 +9,8 @@ import { appendAuditLog } from "@/domain/audit";
 import { createAlert, sendAlertNotifyEvent } from "@/domain/alerts";
 import { evaluateExpenseAnomalyForBuilding } from "@/domain/anomaly";
 import {
-  assertMismatchJustification,
+  assertReceiptAmountMatchesOcr,
   assertReceiptOcrLinkable,
-  needsMismatchJustification,
 } from "./mismatch";
 
 export type CreateTransactionInput = {
@@ -23,6 +22,7 @@ export type CreateTransactionInput = {
   apartmentId?: string | null;
   receiptId?: string | null;
   description?: string | null;
+  /** @deprecated Ignored — receipt amounts must equal OCR; kept for API compat. */
   mismatchJustification?: string | null;
   createdById: string;
 };
@@ -37,6 +37,7 @@ export type CreateTransactionResult = {
   transaction: Transaction;
   alerts: CreatedAlertSummary[];
   anomalyFired: boolean;
+  /** Always false — mismatch override path removed (amount integrity). */
   mismatchOverride: boolean;
   /**
    * When false, caller passed a TransactionClient (nested). Alerts were
@@ -54,7 +55,7 @@ function hasRootTransaction(db: DbClient): db is PrismaClient {
 
 /**
  * Create transaction with integrity gates inside one Prisma `$transaction`:
- * mismatch justification → Transaction → Audit → OCR_MISMATCH alert → anomaly hook.
+ * receipt OCR lock → Transaction → Audit → anomaly hook.
  *
  * Uses Agent 3 contracts:
  * - `appendAuditLog(input, tx)` with `before`/`after`
@@ -79,8 +80,6 @@ export async function createTransactionWithIntegrity(
   const run = async (
     tx: Prisma.TransactionClient,
   ): Promise<Omit<CreateTransactionResult, "notifiedAfterCommit">> => {
-    let ocrAmountCents: number | null = null;
-
     if (input.receiptId) {
       const receipt = await tx.receipt.findUnique({
         where: { id: input.receiptId },
@@ -105,19 +104,11 @@ export async function createTransactionWithIntegrity(
         receiptStatus: receipt.status,
         ocrAmountCents: receipt.ocrAmountCents,
       });
-      ocrAmountCents = receipt.ocrAmountCents;
+      assertReceiptAmountMatchesOcr({
+        amountCents: input.amountCents,
+        ocrAmountCents: receipt.ocrAmountCents!,
+      });
     }
-
-    assertMismatchJustification({
-      amountCents: input.amountCents,
-      ocrAmountCents,
-      justification: input.mismatchJustification,
-    });
-
-    const mismatchOverride = needsMismatchJustification({
-      amountCents: input.amountCents,
-      ocrAmountCents,
-    });
 
     const transaction = await tx.transaction.create({
       data: {
@@ -129,9 +120,7 @@ export async function createTransactionWithIntegrity(
         apartmentId: input.apartmentId ?? null,
         receiptId: input.receiptId ?? null,
         description: input.description ?? null,
-        mismatchJustification: mismatchOverride
-          ? (input.mismatchJustification?.trim() ?? null)
-          : null,
+        mismatchJustification: null,
         createdById: input.createdById,
       },
     });
@@ -153,43 +142,7 @@ export async function createTransactionWithIntegrity(
     );
 
     const alerts: CreatedAlertSummary[] = [];
-
-    if (mismatchOverride) {
-      const alert = await createAlert(
-        {
-          buildingId: input.buildingId,
-          transactionId: transaction.id,
-          type: "OCR_MISMATCH",
-          severity: "HIGH",
-          title: "OCR amount override",
-          body: `Operator amount ${input.amountCents}¢ differs from OCR ${ocrAmountCents}¢. Justification recorded.`,
-          enqueueNotify: false,
-        },
-        tx,
-      );
-      alerts.push({
-        id: alert.id,
-        type: alert.type,
-        severity: alert.severity,
-      });
-
-      await appendAuditLog(
-        {
-          actorId: input.createdById,
-          action: "OCR_AMOUNT_OVERRIDE",
-          entityType: "Transaction",
-          entityId: transaction.id,
-          before: { ocrAmountCents },
-          after: {
-            amountCents: input.amountCents,
-            mismatchJustification:
-              input.mismatchJustification?.trim() ?? null,
-            alertId: alert.id,
-          },
-        },
-        tx,
-      );
-    }
+    const mismatchOverride = false;
 
     let anomalyFired = false;
     if (input.type === "EXPENSE" && input.categoryId) {

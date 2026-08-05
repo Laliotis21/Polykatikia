@@ -1,11 +1,8 @@
 export {
-  assertMismatchJustification,
+  assertReceiptAmountMatchesOcr,
   assertReceiptOcrLinkable,
-  needsMismatchJustification,
-  MismatchJustificationError,
-  MISMATCH_JUSTIFICATION_MIN_LENGTH,
+  ReceiptAmountMismatchError,
 } from "./mismatch";
-export type { MismatchGateInput } from "./mismatch";
 export {
   createTransactionWithIntegrity,
 } from "./create";
