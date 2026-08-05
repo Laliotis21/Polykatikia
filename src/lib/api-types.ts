@@ -135,6 +135,25 @@ export type ExpenseCategoryItem = {
   allocationMethod: AllocationMethod;
 };
 
+export type RecurringExpenseItem = {
+  id: string;
+  buildingId: string;
+  categoryId: string;
+  label: string;
+  amountCents: number;
+  dayOfMonth: number;
+  active: boolean;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  category: { id: string; name: string; code: string | null } | null;
+};
+
+export type RecurringExpensesResponse = {
+  role: Role;
+  recurringExpenses: RecurringExpenseItem[];
+};
+
 export type KoinoxristaLine = {
   apartmentId: string;
   apartmentLabel: string;

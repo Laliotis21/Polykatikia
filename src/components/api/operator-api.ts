@@ -18,6 +18,8 @@ import type {
   PayChargeResponse,
   PortalPayload,
   ReceiptDetail,
+  RecurringExpenseItem,
+  RecurringExpensesResponse,
   TransactionListItem,
 } from "@/lib/api-types";
 
@@ -803,6 +805,98 @@ export async function portalPayCharge(
     }
     const data = (await parseJsonSafe(res)) as PayChargeResponse;
     return { ok: true, data };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export async function fetchRecurringExpenses(
+  buildingId: string,
+): Promise<ApiResult<RecurringExpensesResponse | null>> {
+  try {
+    const res = await fetch(
+      `/api/buildings/${buildingId}/recurring-expenses`,
+      { method: "GET" },
+    );
+    if (!res.ok) {
+      const body = await parseJsonSafe(res);
+      return failureFromStatus(res.status, body, null, "Πάγια API");
+    }
+    const data = (await parseJsonSafe(res)) as RecurringExpensesResponse;
+    return { ok: true, data };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export async function createRecurringExpense(
+  buildingId: string,
+  body: {
+    categoryId: string;
+    label: string;
+    amountCents: number;
+    dayOfMonth?: number;
+    active?: boolean;
+  },
+): Promise<ApiResult<RecurringExpenseItem | null>> {
+  try {
+    const res = await fetch(
+      `/api/buildings/${buildingId}/recurring-expenses`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) {
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Create πάγιο failed (${res.status})`;
+      return errorResult(null, message);
+    }
+    const json = (await parseJsonSafe(res)) as {
+      recurringExpense: RecurringExpenseItem;
+    };
+    return { ok: true, data: json.recurringExpense };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export async function patchRecurringExpense(
+  buildingId: string,
+  rid: string,
+  body: {
+    active?: boolean;
+    amountCents?: number;
+    label?: string;
+    dayOfMonth?: number;
+    categoryId?: string;
+  },
+): Promise<ApiResult<RecurringExpenseItem | null>> {
+  try {
+    const res = await fetch(
+      `/api/buildings/${buildingId}/recurring-expenses/${rid}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) {
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Update πάγιο failed (${res.status})`;
+      return errorResult(null, message);
+    }
+    const json = (await parseJsonSafe(res)) as {
+      recurringExpense: RecurringExpenseItem;
+    };
+    return { ok: true, data: json.recurringExpense };
   } catch {
     return pendingResult(null);
   }

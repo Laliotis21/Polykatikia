@@ -57,7 +57,7 @@ function serializeRecurring(row: {
  */
 export async function GET(_request: Request, context: RouteContext) {
   try {
-    requireViewer(await getSessionUser());
+    const user = requireViewer(await getSessionUser());
     const { id: buildingId } = await context.params;
 
     const building = await prisma.building.findUnique({
@@ -77,6 +77,7 @@ export async function GET(_request: Request, context: RouteContext) {
     });
 
     return NextResponse.json({
+      role: user.role,
       recurringExpenses: rows.map(serializeRecurring),
     });
   } catch (err) {
