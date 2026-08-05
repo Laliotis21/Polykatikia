@@ -130,6 +130,17 @@ export function requireOperator(user: SessionUser | null): SessionUser {
   return user;
 }
 
+/** Require ADMIN for privileged config writes (e.g. πάγια amounts). */
+export function requireAdmin(user: SessionUser | null): SessionUser {
+  if (!user) {
+    throw new AuthError(401, "Unauthorized");
+  }
+  if (user.role !== "ADMIN") {
+    throw new AuthError(403, "Forbidden: ADMIN required");
+  }
+  return user;
+}
+
 /** Require any authenticated role that can view (VIEWER+). */
 export function requireViewer(user: SessionUser | null): SessionUser {
   if (!user) {
