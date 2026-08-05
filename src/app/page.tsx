@@ -211,9 +211,9 @@ export default function HomePage() {
             <Link
               href="/login"
               className={buttonStyles(
-                "primary",
+                "secondary",
                 "lg",
-                "bg-white text-aegean-800 hover:bg-brass-100 hover:text-aegean-900",
+                "border-transparent bg-white shadow-sm hover:border-transparent hover:bg-brass-100",
               )}
             >
               Είσοδος
