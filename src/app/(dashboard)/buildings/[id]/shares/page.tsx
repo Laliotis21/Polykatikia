@@ -111,6 +111,18 @@ export default function SharesPage({
         elevatorShareBps: apt.elevatorShareBps,
         heatingShareBps: apt.heatingShareBps,
         floor: apt.floor,
+        ...(apt.owner?.id ||
+        apt.owner?.name?.trim() ||
+        apt.owner?.email?.trim() ||
+        apt.owner?.phone?.trim()
+          ? {
+              owner: {
+                name: apt.owner?.name?.trim() || undefined,
+                email: apt.owner?.email?.trim() || null,
+                phone: apt.owner?.phone?.trim() || null,
+              },
+            }
+          : {}),
       });
       if (!result.ok || !result.data) {
         setError(result.ok ? "Η αποθήκευση δεν επιβεβαιώθηκε." : result.message);
@@ -121,6 +133,33 @@ export default function SharesPage({
       await reload();
       setSavingId(null);
     });
+  }
+
+  function updateApartment(
+    index: number,
+    patch: Partial<ApartmentSharesItem>,
+  ) {
+    setApartments((prev) =>
+      prev.map((a, i) => (i === index ? { ...a, ...patch } : a)),
+    );
+  }
+
+  function updateOwner(
+    index: number,
+    patch: Partial<NonNullable<ApartmentSharesItem["owner"]>>,
+  ) {
+    setApartments((prev) =>
+      prev.map((a, i) => {
+        if (i !== index) return a;
+        const current = a.owner ?? {
+          id: "",
+          name: "",
+          email: null,
+          phone: null,
+        };
+        return { ...a, owner: { ...current, ...patch } };
+      }),
+    );
   }
 
   function saveCategory(cat: ExpenseCategoryItem, method: AllocationMethod) {
@@ -142,21 +181,12 @@ export default function SharesPage({
     });
   }
 
-  function updateApartment(
-    index: number,
-    patch: Partial<ApartmentSharesItem>,
-  ) {
-    setApartments((prev) =>
-      prev.map((a, i) => (i === index ? { ...a, ...patch } : a)),
-    );
-  }
-
   return (
     <div className="flex flex-col gap-10">
       <PageHeader
         eyebrow={buildingName}
-        title="Χιλιοστά & κλειδιά κατανομής"
-        description="Ορίστε τα χιλιοστά κάθε διαμερίσματος και τον τρόπο επιμερισμού κάθε κατηγορίας δαπάνης."
+        title="Χιλιοστά & επαφές"
+        description="Χιλιοστά ανά διαμέρισμα, κλειδιά κατανομής, και στοιχεία επικοινωνίας ιδιοκτητών."
         actions={
           <Link
             href={`/buildings/${id}/koinoxrista`}
@@ -197,8 +227,8 @@ export default function SharesPage({
       ) : (
         <>
           <Section
-            title="Διαμερίσματα"
-            description="Τα χιλιοστά εκφράζονται σε bps — κάθε στήλη πρέπει να αθροίζει σε 10.000."
+            title="Διαμερίσματα & επαφές"
+            description="Χιλιοστά σε bps (σύνολο 10.000) και στοιχεία επικοινωνίας ιδιοκτήτη."
             order={0}
           >
             <div className="flex flex-wrap gap-x-6 gap-y-2">
@@ -209,11 +239,11 @@ export default function SharesPage({
 
             <div className="panel overflow-x-auto">
               <table
-                className="w-full min-w-3xl border-collapse text-left text-sm"
+                className="w-full min-w-5xl border-collapse text-left text-sm"
                 aria-labelledby={`${formId}-apts`}
               >
                 <caption id={`${formId}-apts`} className="sr-only">
-                  Χιλιοστά ανά διαμέρισμα
+                  Χιλιοστά και επαφές ανά διαμέρισμα
                 </caption>
                 <thead>
                   <tr className="border-b border-border-soft bg-marble-100/70">
@@ -234,6 +264,12 @@ export default function SharesPage({
                     </th>
                     <th scope="col" className="eyebrow px-5 py-3">
                       Ιδιοκτήτης
+                    </th>
+                    <th scope="col" className="eyebrow px-5 py-3">
+                      Email
+                    </th>
+                    <th scope="col" className="eyebrow px-5 py-3">
+                      Τηλέφωνο
                     </th>
                     <th scope="col" className="px-5 py-3">
                       <span className="sr-only">Αποθήκευση</span>
@@ -313,8 +349,50 @@ export default function SharesPage({
                           }
                         />
                       </td>
-                      <td className="px-5 py-3 whitespace-nowrap text-ink-muted">
-                        {apt.owner?.name ?? "—"}
+                      <td className="px-5 py-3">
+                        <input
+                          aria-label={`Όνομα ιδιοκτήτη ${apt.label}`}
+                          type="text"
+                          className={cn(
+                            controlStyles,
+                            "font-sans min-h-11 w-40 px-2.5 text-sm",
+                          )}
+                          value={apt.owner?.name ?? ""}
+                          placeholder="Ονοματεπώνυμο"
+                          onChange={(e) =>
+                            updateOwner(index, { name: e.target.value })
+                          }
+                        />
+                      </td>
+                      <td className="px-5 py-3">
+                        <input
+                          aria-label={`Email ιδιοκτήτη ${apt.label}`}
+                          type="email"
+                          className={cn(
+                            controlStyles,
+                            "font-sans min-h-11 w-44 px-2.5 text-sm",
+                          )}
+                          value={apt.owner?.email ?? ""}
+                          placeholder="email@"
+                          onChange={(e) =>
+                            updateOwner(index, { email: e.target.value })
+                          }
+                        />
+                      </td>
+                      <td className="px-5 py-3">
+                        <input
+                          aria-label={`Τηλέφωνο ιδιοκτήτη ${apt.label}`}
+                          type="tel"
+                          className={cn(
+                            controlStyles,
+                            "font-sans min-h-11 w-32 px-2.5 text-sm",
+                          )}
+                          value={apt.owner?.phone ?? ""}
+                          placeholder="τηλ."
+                          onChange={(e) =>
+                            updateOwner(index, { phone: e.target.value })
+                          }
+                        />
                       </td>
                       <td className="px-5 py-3 text-right">
                         <Button

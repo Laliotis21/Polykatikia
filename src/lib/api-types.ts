@@ -119,7 +119,12 @@ export type ApartmentSharesItem = {
   elevatorShareBps: number;
   heatingShareBps: number;
   floor: number | null;
-  owner?: { id: string; name: string; email: string | null } | null;
+  owner?: {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+  } | null;
 };
 
 export type ExpenseCategoryItem = {

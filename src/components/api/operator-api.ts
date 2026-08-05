@@ -101,6 +101,63 @@ export async function fetchBuildings(): Promise<ApiResult<BuildingSummary[]>> {
   }
 }
 
+export async function createBuilding(body: {
+  name: string;
+  address?: string | null;
+}): Promise<ApiResult<BuildingSummary | null>> {
+  try {
+    const res = await fetch("/api/buildings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 404 || res.status === 501) {
+      return pendingResult(null);
+    }
+    if (!res.ok) {
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Create failed (${res.status})`;
+      return errorResult(null, message);
+    }
+    const json = (await parseJsonSafe(res)) as { building: BuildingSummary };
+    return { ok: true, data: json.building };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export async function patchBuilding(body: {
+  id: string;
+  name?: string;
+  address?: string | null;
+}): Promise<ApiResult<BuildingSummary | null>> {
+  try {
+    const res = await fetch("/api/buildings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 404 || res.status === 501) {
+      return pendingResult(null);
+    }
+    if (!res.ok) {
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Update failed (${res.status})`;
+      return errorResult(null, message);
+    }
+    const json = (await parseJsonSafe(res)) as { building: BuildingSummary };
+    return { ok: true, data: json.building };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
 export async function uploadReceipt(input: {
   file: File;
   buildingId: string;
@@ -329,6 +386,11 @@ export async function patchApartmentShares(
     elevatorShareBps?: number;
     heatingShareBps?: number;
     floor?: number | null;
+    owner?: {
+      name?: string;
+      email?: string | null;
+      phone?: string | null;
+    };
   },
 ): Promise<ApiResult<ApartmentSharesItem | null>> {
   try {

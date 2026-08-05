@@ -1,9 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandLockup } from "@/components/shell/Brand";
-import { buildingIdFromPath, navGroups } from "@/components/shell/nav";
+import { BuildingSelector } from "@/components/shell/BuildingSelector";
+import {
+  navGroups,
+  resolveBuildingId,
+  writeStoredBuildingId,
+} from "@/components/shell/nav";
 import { cn } from "@/lib/cn";
 
 type SidebarProps = {
@@ -17,7 +23,17 @@ type SidebarProps = {
  */
 export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname();
-  const groups = navGroups(buildingIdFromPath(pathname));
+  const [buildingId, setBuildingId] = useState(() =>
+    resolveBuildingId(pathname),
+  );
+
+  useEffect(() => {
+    const next = resolveBuildingId(pathname);
+    setBuildingId(next);
+    writeStoredBuildingId(next);
+  }, [pathname]);
+
+  const groups = navGroups(buildingId);
 
   return (
     <div className="flex h-full flex-col">
@@ -31,6 +47,12 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           <BrandLockup subtitle="Διαχείριση κοινοχρήστων" />
         </Link>
       </div>
+
+      <BuildingSelector
+        buildingId={buildingId}
+        onBuildingChange={setBuildingId}
+        onNavigate={onNavigate}
+      />
 
       <nav
         aria-label="Κύρια πλοήγηση"

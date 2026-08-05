@@ -1,5 +1,6 @@
 import {
   Bell,
+  Building2,
   Calculator,
   FileUp,
   LayoutDashboard,
@@ -8,8 +9,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/** Building shown in the shell until multi-building selection ships. */
+/** Fallback when no building is selected yet (matches prisma/seed.ts). */
 export const DEFAULT_BUILDING_ID = "seed-building-kolonaki";
+
+const STORAGE_KEY = "polykatoikia:selected-building-id";
 
 export type NavItem = {
   href: string;
@@ -23,13 +26,57 @@ export type NavGroup = {
   items: NavItem[];
 };
 
+/** Persist selected building for shell links outside `/buildings/:id/...`. */
+export function readStoredBuildingId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredBuildingId(id: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY, id);
+  } catch {
+    // Quota / private mode — ignore.
+  }
+}
+
 /**
  * Reads the building id out of the current path so building-scoped links keep
  * the user on the building they are already looking at.
  */
-export function buildingIdFromPath(pathname: string): string {
+export function buildingIdFromPath(pathname: string): string | null {
   const match = /^\/buildings\/([^/]+)/.exec(pathname);
-  return match?.[1] ?? DEFAULT_BUILDING_ID;
+  // `/buildings` (list) has no id segment.
+  if (!match?.[1] || match[1] === "new") return null;
+  return match[1];
+}
+
+/** Active building: path → stored → seed default. */
+export function resolveBuildingId(pathname: string): string {
+  return (
+    buildingIdFromPath(pathname) ??
+    readStoredBuildingId() ??
+    DEFAULT_BUILDING_ID
+  );
+}
+
+/**
+ * When switching buildings on a scoped route, keep the same leaf
+ * (`/expenses`, `/koinoxrista`, `/shares`); otherwise go to expenses.
+ */
+export function buildingScopedHref(
+  pathname: string,
+  buildingId: string,
+): string {
+  const leaf = pathname.match(
+    /^\/buildings\/[^/]+\/(expenses|koinoxrista|shares)/,
+  )?.[1];
+  return `/buildings/${buildingId}/${leaf ?? "expenses"}`;
 }
 
 export function navGroups(buildingId: string): NavGroup[] {
@@ -61,6 +108,12 @@ export function navGroups(buildingId: string): NavGroup[] {
       label: "Κτίριο",
       items: [
         {
+          href: "/buildings",
+          label: "Κτίρια",
+          icon: Building2,
+          isActive: (p) => p === "/buildings",
+        },
+        {
           href: `/buildings/${buildingId}/expenses`,
           label: "Έξοδα",
           icon: ReceiptText,
@@ -86,6 +139,7 @@ export function navGroups(buildingId: string): NavGroup[] {
 /** Page titles for the top bar, longest-prefix first. */
 const TITLES: Array<{ match: (p: string) => boolean; title: string }> = [
   { match: (p) => p === "/overview", title: "Επισκόπηση" },
+  { match: (p) => p === "/buildings", title: "Κτίρια" },
   { match: (p) => p.startsWith("/receipts/upload"), title: "Νέα απόδειξη" },
   { match: (p) => /\/receipts\/[^/]+\/review/.test(p), title: "Έλεγχος OCR" },
   {
@@ -94,7 +148,7 @@ const TITLES: Array<{ match: (p: string) => boolean; title: string }> = [
   },
   { match: (p) => p.endsWith("/expenses"), title: "Έξοδα κτιρίου" },
   { match: (p) => p.endsWith("/koinoxrista"), title: "Κοινόχρηστα" },
-  { match: (p) => p.endsWith("/shares"), title: "Χιλιοστά" },
+  { match: (p) => p.endsWith("/shares"), title: "Χιλιοστά & επαφές" },
   { match: (p) => p.startsWith("/alerts"), title: "Ειδοποιήσεις" },
 ];
 

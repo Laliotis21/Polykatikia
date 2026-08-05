@@ -20,36 +20,43 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { MoneyText } from "@/components/money/MoneyText";
 import { AlertBadge, severityKind } from "@/components/alerts/AlertBadge";
 import { buttonStyles } from "@/components/ui/Button";
-import { DEFAULT_BUILDING_ID } from "@/components/shell/nav";
+import {
+  DEFAULT_BUILDING_ID,
+  resolveBuildingId,
+  writeStoredBuildingId,
+} from "@/components/shell/nav";
 import {
   fetchAlerts,
   fetchBuildingTransactions,
+  fetchBuildings,
   SEED_BUILDINGS,
   severityRank,
   txHasMismatch,
 } from "@/components/api/operator-api";
 import type { AlertListItem, TransactionListItem } from "@/lib/api-types";
 
-const QUICK_ACTIONS = [
-  {
-    href: "/receipts/upload",
-    icon: FileUp,
-    title: "Νέα απόδειξη",
-    body: "Ανέβασμα και έλεγχος OCR",
-  },
-  {
-    href: `/buildings/${DEFAULT_BUILDING_ID}/koinoxrista`,
-    icon: Calculator,
-    title: "Κοινόχρηστα",
-    body: "Κατανομή περιόδου σε διαμερίσματα",
-  },
-  {
-    href: `/buildings/${DEFAULT_BUILDING_ID}/shares`,
-    icon: Scale,
-    title: "Χιλιοστά",
-    body: "Κλειδιά κατανομής ανά κατηγορία",
-  },
-];
+function quickActions(buildingId: string) {
+  return [
+    {
+      href: "/receipts/upload",
+      icon: FileUp,
+      title: "Νέα απόδειξη",
+      body: "Ανέβασμα και έλεγχος OCR",
+    },
+    {
+      href: `/buildings/${buildingId}/koinoxrista`,
+      icon: Calculator,
+      title: "Κοινόχρηστα",
+      body: "Κατανομή περιόδου σε διαμερίσματα",
+    },
+    {
+      href: `/buildings/${buildingId}/shares`,
+      icon: Scale,
+      title: "Χιλιοστά",
+      body: "Κλειδιά κατανομής ανά κατηγορία",
+    },
+  ];
+}
 
 function formatDate(iso: string): string {
   try {
@@ -71,14 +78,28 @@ function isCurrentMonth(iso: string): boolean {
 }
 
 export default function OverviewPage() {
-  const buildingId = DEFAULT_BUILDING_ID;
-  const buildingName =
-    SEED_BUILDINGS.find((b) => b.id === buildingId)?.name ?? buildingId;
+  const [buildingId, setBuildingId] = useState(DEFAULT_BUILDING_ID);
+  const [buildingName, setBuildingName] = useState(
+    () =>
+      SEED_BUILDINGS.find((b) => b.id === DEFAULT_BUILDING_ID)?.name ??
+      DEFAULT_BUILDING_ID,
+  );
 
   const [transactions, setTransactions] = useState<TransactionListItem[]>([]);
   const [alerts, setAlerts] = useState<AlertListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    const id = resolveBuildingId("/overview");
+    setBuildingId(id);
+    writeStoredBuildingId(id);
+    void (async () => {
+      const result = await fetchBuildings();
+      const match = result.data.find((b) => b.id === id);
+      if (match) setBuildingName(match.name);
+    })();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -207,7 +228,7 @@ export default function OverviewPage() {
         order={1}
       >
         <div className="grid gap-4 sm:grid-cols-3">
-          {QUICK_ACTIONS.map(({ href, icon: Icon, title, body }) => (
+          {quickActions(buildingId).map(({ href, icon: Icon, title, body }) => (
             <Link key={href} href={href} className="card-interactive group p-5">
               <span className="flex size-10 items-center justify-center rounded-lg bg-aegean-50 text-aegean-600 ring-1 ring-aegean-100">
                 <Icon className="size-5" aria-hidden strokeWidth={1.9} />

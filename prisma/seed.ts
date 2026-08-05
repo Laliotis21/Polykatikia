@@ -95,24 +95,28 @@ async function main() {
       id: "seed-owner-1",
       name: "Μαρία Παπαδοπούλου",
       email: "maria@example.com",
+      phone: "+30 210 123 4501",
       apartmentId: "seed-apt-a1",
     },
     {
       id: "seed-owner-2",
       name: "Γιάννης Νικολάου",
       email: "giannis@example.com",
+      phone: "+30 210 123 4502",
       apartmentId: "seed-apt-a2",
     },
     {
       id: "seed-owner-3",
       name: "Ελένη Κωνσταντίνου",
       email: "eleni@example.com",
+      phone: "+30 694 123 4503",
       apartmentId: "seed-apt-b1",
     },
     {
       id: "seed-owner-4",
       name: "Νίκος Δημητρίου",
       email: null,
+      phone: "+30 697 123 4504",
       apartmentId: "seed-apt-b2",
     },
   ] as const;
@@ -122,11 +126,16 @@ async function main() {
   for (const owner of owners) {
     await prisma.owner.upsert({
       where: { id: owner.id },
-      update: {},
+      update: {
+        name: owner.name,
+        email: owner.email,
+        phone: owner.phone,
+      },
       create: {
         id: owner.id,
         name: owner.name,
         email: owner.email,
+        phone: owner.phone,
       },
     });
 
@@ -187,6 +196,27 @@ async function main() {
     });
   }
 
+  // Winter HEATING demo expense — allocated via static heatingShareBps (not meters).
+  const heatingExpense = await prisma.transaction.upsert({
+    where: { id: "seed-tx-heating-jan-2026" },
+    update: {
+      amountCents: 125000,
+      description: "Πετρέλαιο θέρμανσης — Ιανουάριος 2026",
+      occurredAt: new Date("2026-01-15T10:00:00.000Z"),
+      categoryId: "seed-cat-heating",
+    },
+    create: {
+      id: "seed-tx-heating-jan-2026",
+      buildingId: building.id,
+      categoryId: "seed-cat-heating",
+      type: "EXPENSE",
+      amountCents: 125000,
+      description: "Πετρέλαιο θέρμανσης — Ιανουάριος 2026",
+      occurredAt: new Date("2026-01-15T10:00:00.000Z"),
+      createdById: admin.id,
+    },
+  });
+
   console.log("Seed complete:", {
     admin: admin.email,
     operator: operator.email,
@@ -194,6 +224,11 @@ async function main() {
     apartments: apartments.length,
     owners: owners.length,
     categories: categories.length,
+    heatingExpense: {
+      id: heatingExpense.id,
+      amountCents: heatingExpense.amountCents,
+      month: "2026-01",
+    },
   });
 }
 
