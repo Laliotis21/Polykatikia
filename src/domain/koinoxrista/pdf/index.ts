@@ -1,5 +1,6 @@
 export { pdfColors } from "./colors";
 export { KoinoxristaPdfDocument } from "./document";
+export { PDF_FONT_FAMILY, ensurePdfFontsRegistered } from "./fonts";
 export { koinoxristaPdfFilename, renderKoinoxristaPdf } from "./render";
 export {
   ALLOCATION_METHOD_LABELS_EL,

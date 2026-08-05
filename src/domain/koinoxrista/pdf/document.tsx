@@ -8,6 +8,7 @@ import {
   Rect,
 } from "@react-pdf/renderer";
 import { pdfColors as c } from "./colors";
+import { PDF_FONT_FAMILY } from "./fonts";
 import type { KoinoxristaPdfViewModel, PdfApartmentPage } from "./view-model";
 
 const styles = StyleSheet.create({
@@ -16,7 +17,7 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
     paddingHorizontal: 40,
     fontSize: 9,
-    fontFamily: "Helvetica",
+    fontFamily: PDF_FONT_FAMILY,
     color: c.ink,
     backgroundColor: c.marble0,
   },
@@ -28,7 +29,8 @@ const styles = StyleSheet.create({
   },
   brandTitle: {
     fontSize: 14,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
     color: c.aegean700,
   },
   brandSub: {
@@ -41,7 +43,8 @@ const styles = StyleSheet.create({
   },
   docTitle: {
     fontSize: 13,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
     color: c.ink,
     marginBottom: 4,
   },
@@ -60,7 +63,8 @@ const styles = StyleSheet.create({
   bannerText: {
     color: c.marble0,
     fontSize: 10,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
   },
   bannerSub: {
     color: c.aegean100,
@@ -79,12 +83,14 @@ const styles = StyleSheet.create({
   },
   draftText: {
     fontSize: 8,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
     color: c.brass700,
   },
   sectionTitle: {
     fontSize: 9,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
     color: c.aegean700,
     marginBottom: 6,
     marginTop: 4,
@@ -106,7 +112,8 @@ const styles = StyleSheet.create({
   th: {
     color: c.marble0,
     fontSize: 7,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
@@ -147,12 +154,14 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: 9,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
     color: c.aegean800,
   },
   totalAmount: {
     fontSize: 14,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
     color: c.brass500,
   },
   payBox: {
@@ -174,7 +183,8 @@ const styles = StyleSheet.create({
   },
   payAmount: {
     fontSize: 22,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
     color: c.brass500,
   },
   footer: {
@@ -199,7 +209,8 @@ const styles = StyleSheet.create({
     right: 0,
     textAlign: "center",
     fontSize: 48,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
     color: c.marble300,
     opacity: 0.45,
     transform: "rotate(-28deg)",
@@ -226,9 +237,14 @@ const styles = StyleSheet.create({
   },
   metaChipValue: {
     fontSize: 8,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
     color: c.ink,
     marginTop: 1,
+  },
+  cellBold: {
+    fontFamily: PDF_FONT_FAMILY,
+    fontWeight: 700,
   },
 });
 
@@ -376,23 +392,13 @@ function SummaryPage({ vm }: { vm: KoinoxristaPdfViewModel }) {
             key={`${row.label}-${i}`}
             style={[styles.row, i % 2 === 1 ? styles.rowAlt : {}]}
           >
-            <Text
-              style={[
-                styles.cell,
-                { width: "18%", fontFamily: "Helvetica-Bold" },
-              ]}
-            >
+            <Text style={[styles.cell, styles.cellBold, { width: "18%" }]}>
               {row.label}
             </Text>
             <Text style={[styles.cellMuted, { width: "52%" }]}>
               {row.ownerName?.trim() || "—"}
             </Text>
-            <Text
-              style={[
-                styles.cellRight,
-                { width: "30%", fontFamily: "Helvetica-Bold" },
-              ]}
-            >
+            <Text style={[styles.cellRight, styles.cellBold, { width: "30%" }]}>
               {row.totalLabel}
             </Text>
           </View>
@@ -403,20 +409,15 @@ function SummaryPage({ vm }: { vm: KoinoxristaPdfViewModel }) {
             { backgroundColor: c.aegean50, borderTopColor: c.aegean600 },
           ]}
         >
-          <Text
-            style={[
-              styles.cell,
-              { width: "70%", fontFamily: "Helvetica-Bold" },
-            ]}
-          >
+          <Text style={[styles.cell, styles.cellBold, { width: "70%" }]}>
             Σύνολο κατανομής
           </Text>
           <Text
             style={[
               styles.cellRight,
+              styles.cellBold,
               {
                 width: "30%",
-                fontFamily: "Helvetica-Bold",
                 color: c.brass500,
                 fontSize: 10,
               },

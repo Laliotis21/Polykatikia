@@ -1,5 +1,6 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import { KoinoxristaPdfDocument } from "./document";
+import { ensurePdfFontsRegistered } from "./fonts";
 import {
   buildKoinoxristaPdfViewModel,
   type KoinoxristaPdfInput,
@@ -9,6 +10,7 @@ import {
 export async function renderKoinoxristaPdf(
   input: KoinoxristaPdfInput,
 ): Promise<Buffer> {
+  ensurePdfFontsRegistered();
   const vm = buildKoinoxristaPdfViewModel(input);
   const buffer = await renderToBuffer(<KoinoxristaPdfDocument vm={vm} />);
   return Buffer.from(buffer);
