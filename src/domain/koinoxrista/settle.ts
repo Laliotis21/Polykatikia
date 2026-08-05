@@ -6,6 +6,7 @@ import type {
   SettlementStatus,
 } from "@prisma/client";
 import { appendAuditLog } from "@/domain/audit";
+import { sendAlertNotifyEvent } from "@/domain/alerts";
 import {
   athensLocalToUtc,
   buildKoinoxristaStatement,
@@ -20,6 +21,7 @@ import {
   MSG_MISSING_HEATING_READINGS,
 } from "./errors";
 import { mintRecurringExpensesForPeriod } from "@/domain/recurring";
+import type { CreatedAlertSummary } from "@/domain/transactions";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -245,9 +247,24 @@ function chargeOccurredAtForPeriod(year: number, month: number): Date {
 }
 
 /**
+ * Alert IDs from nested mint that still need `sendAlertNotifyEvent`
+ * after the outermost commit. Empty when mint already notified.
+ */
+export function pendingMintNotifyAlertIds(mint: {
+  alerts: CreatedAlertSummary[];
+  notifiedAfterCommit: boolean;
+}): string[] {
+  if (mint.notifiedAfterCommit) return [];
+  return mint.alerts.map((a) => a.id);
+}
+
+/**
  * Persist settlement lines and create per-apartment CHARGE transactions.
  * Idempotent guard: refuses if a FINALIZED settlement already exists for the period.
  * Refuses empty finalize (nothing to allocate).
+ *
+ * Nested πάγια mint runs inside `$transaction` with `enqueueNotify: false`;
+ * HIGH alerts are notified via `sendAlertNotifyEvent` after commit.
  */
 export async function finalizeKoinoxristaSettlement(
   db: PrismaClient,
@@ -261,7 +278,7 @@ export async function finalizeKoinoxristaSettlement(
   const label = periodLabel(input.year, input.month);
   const chargeOccurredAt = chargeOccurredAtForPeriod(input.year, input.month);
 
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     // Serialize concurrent finalize for this building (TOCTOU / P2002 races).
     await tx.$queryRaw`SELECT id FROM "Building" WHERE id = ${input.buildingId} FOR UPDATE`;
 
@@ -281,7 +298,8 @@ export async function finalizeKoinoxristaSettlement(
     }
 
     // Mint missing active πάγια so they appear in period expenses.
-    await mintRecurringExpensesForPeriod(tx, {
+    // Nested TransactionClient → createTransactionWithIntegrity skips notify.
+    const mintResult = await mintRecurringExpensesForPeriod(tx, {
       buildingId: input.buildingId,
       year: input.year,
       month: input.month,
@@ -403,6 +421,32 @@ export async function finalizeKoinoxristaSettlement(
       totalCents: allocatable,
       chargeTransactionIds,
       statement,
+      pendingNotifyAlertIds: pendingMintNotifyAlertIds(mintResult),
     };
   });
+
+  // After outermost commit: enqueue admin notify for HIGH alerts from nested mint.
+  for (const alertId of result.pendingNotifyAlertIds) {
+    try {
+      await sendAlertNotifyEvent(alertId);
+    } catch (err) {
+      await appendAuditLog({
+        actorId: input.createdById,
+        action: "NOTIFY_FAILED",
+        entityType: "Alert",
+        entityId: alertId,
+        after: {
+          error: err instanceof Error ? err.message : String(err),
+        },
+      });
+      throw err;
+    }
+  }
+
+  return {
+    settlementId: result.settlementId,
+    totalCents: result.totalCents,
+    chargeTransactionIds: result.chargeTransactionIds,
+    statement: result.statement,
+  };
 }

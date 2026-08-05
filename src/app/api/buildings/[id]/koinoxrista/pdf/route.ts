@@ -30,7 +30,7 @@ const periodSchema = z.object({
  */
 export async function GET(request: Request, context: RouteContext) {
   try {
-    requireViewer(await getSessionUser());
+    const user = requireViewer(await getSessionUser());
     const { id: buildingId } = await context.params;
 
     const building = await prisma.building.findUnique({
@@ -59,7 +59,12 @@ export async function GET(request: Request, context: RouteContext) {
     const { year, month } = parsed.data;
 
     const [preview, apartments] = await Promise.all([
-      previewKoinoxrista(prisma, { buildingId, year, month }),
+      previewKoinoxrista(prisma, {
+        buildingId,
+        year,
+        month,
+        createdById: user.id,
+      }),
       prisma.apartment.findMany({
         where: { buildingId },
         select: {

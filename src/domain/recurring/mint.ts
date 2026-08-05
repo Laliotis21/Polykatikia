@@ -1,5 +1,8 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import { createTransactionWithIntegrity } from "@/domain/transactions";
+import {
+  createTransactionWithIntegrity,
+  type CreatedAlertSummary,
+} from "@/domain/transactions";
 import { athensLocalToUtc } from "@/domain/koinoxrista/allocate";
 
 export type RecurringTemplate = {
@@ -20,6 +23,18 @@ export type RecurringMintPlan = {
   description: string;
   year: number;
   month: number;
+};
+
+export type MintRecurringResult = {
+  mintedIds: string[];
+  /** Alerts from nested creates; notify after outer commit when notifiedAfterCommit is false. */
+  alerts: CreatedAlertSummary[];
+  /**
+   * True when mint ran on a PrismaClient (each create owned its `$transaction`
+   * and already called `sendAlertNotifyEvent`). False when nested in a
+   * TransactionClient — caller must notify after outermost commit.
+   */
+  notifiedAfterCommit: boolean;
 };
 
 /** Pure planner: active templates not yet minted for the period. */
@@ -70,7 +85,7 @@ export async function mintRecurringExpensesForPeriod(
     month: number;
     createdById: string;
   },
-): Promise<{ mintedIds: string[] }> {
+): Promise<MintRecurringResult> {
   const templates = await db.recurringExpense.findMany({
     where: { buildingId: input.buildingId, active: true },
     select: {
@@ -85,7 +100,7 @@ export async function mintRecurringExpensesForPeriod(
   });
 
   if (templates.length === 0) {
-    return { mintedIds: [] };
+    return { mintedIds: [], alerts: [], notifiedAfterCommit: true };
   }
 
   const existing = await db.transaction.findMany({
@@ -112,6 +127,8 @@ export async function mintRecurringExpensesForPeriod(
   });
 
   const mintedIds: string[] = [];
+  const alerts: CreatedAlertSummary[] = [];
+  let notifiedAfterCommit = true;
   const templateById = new Map(templates.map((t) => [t.id, t]));
 
   for (const plan of plans) {
@@ -130,7 +147,12 @@ export async function mintRecurringExpensesForPeriod(
       recurringPeriodMonth: plan.month,
     });
     mintedIds.push(result.transaction.id);
+    alerts.push(...result.alerts);
+    // Any nested create means caller must notify after outermost commit.
+    if (!result.notifiedAfterCommit) {
+      notifiedAfterCommit = false;
+    }
   }
 
-  return { mintedIds };
+  return { mintedIds, alerts, notifiedAfterCommit };
 }

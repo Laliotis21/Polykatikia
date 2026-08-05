@@ -8,7 +8,10 @@ import {
   MSG_ZERO_WEIGHTS,
 } from "./errors";
 import { mapKoinoxristaHttpError } from "./http";
-import { assertHeatingReadingsForFinalize } from "./settle";
+import {
+  assertHeatingReadingsForFinalize,
+  pendingMintNotifyAlertIds,
+} from "./settle";
 
 describe("mapKoinoxristaHttpError", () => {
   it("maps empty finalize to 400 with bilingual message", () => {
@@ -111,5 +114,37 @@ describe("empty finalize guard", () => {
         throw new KoinoxristaError(MSG_EMPTY_FINALIZE, 400);
       }
     }).toThrow(KoinoxristaError);
+  });
+});
+
+describe("pendingMintNotifyAlertIds", () => {
+  it("returns alert ids when mint nested (notifiedAfterCommit false)", () => {
+    expect(
+      pendingMintNotifyAlertIds({
+        notifiedAfterCommit: false,
+        alerts: [
+          { id: "a1", type: "ANOMALY", severity: "HIGH" },
+          { id: "a2", type: "ANOMALY", severity: "HIGH" },
+        ],
+      }),
+    ).toEqual(["a1", "a2"]);
+  });
+
+  it("returns empty when mint already notified (owns commit)", () => {
+    expect(
+      pendingMintNotifyAlertIds({
+        notifiedAfterCommit: true,
+        alerts: [{ id: "a1", type: "ANOMALY", severity: "HIGH" }],
+      }),
+    ).toEqual([]);
+  });
+
+  it("returns empty when no alerts", () => {
+    expect(
+      pendingMintNotifyAlertIds({
+        notifiedAfterCommit: false,
+        alerts: [],
+      }),
+    ).toEqual([]);
   });
 });

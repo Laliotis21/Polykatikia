@@ -25,5 +25,6 @@ export { mapKoinoxristaHttpError } from "./http";
 export {
   assertHeatingReadingsForFinalize,
   finalizeKoinoxristaSettlement,
+  pendingMintNotifyAlertIds,
   previewKoinoxrista,
 } from "./settle";
