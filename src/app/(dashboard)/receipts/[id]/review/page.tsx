@@ -1,8 +1,9 @@
 "use client";
 
-import { use, useEffect, useId, useMemo, useState } from "react";
+import { use, useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileQuestion } from "lucide-react";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -10,19 +11,16 @@ import { Button, buttonStyles } from "@/components/ui/Button";
 import { Field, inputStyles } from "@/components/ui/Field";
 import { Badge } from "@/components/ui/Badge";
 import { MoneyText } from "@/components/money/MoneyText";
-import { MismatchBanner } from "@/components/receipts/MismatchBanner";
 import { ReceiptSteps } from "@/components/receipts/ReceiptSteps";
-import Link from "next/link";
 import {
+  createTransaction,
+  fetchExpenseCategories,
   fetchReceipt,
   loadReceiptDraft,
   saveReceiptDraft,
   type ReceiptDraft,
 } from "@/components/api/operator-api";
-import {
-  centsToEurInput,
-  parseEurInputToCents,
-} from "@/components/money/parseEurInput";
+import type { ExpenseCategoryItem } from "@/lib/api-types";
 
 const STATUS_LABELS: Record<string, string> = {
   UPLOADED: "Ανέβηκε",
@@ -61,14 +59,16 @@ export default function OcrReviewPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const amountId = useId();
+  const categoryId = useId();
   const descId = useId();
 
   const [draft, setDraft] = useState<ReceiptDraft | null>(null);
+  const [categories, setCategories] = useState<ExpenseCategoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiPending, setApiPending] = useState(false);
-  const [amountEuro, setAmountEuro] = useState("");
+  const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -76,8 +76,15 @@ export default function OcrReviewPage({
     (async () => {
       setLoading(true);
       const cached = loadReceiptDraft(id);
-      const remote = await fetchReceipt(id);
+      const [remote, cats] = await Promise.all([
+        fetchReceipt(id),
+        fetchExpenseCategories(),
+      ]);
       if (cancelled) return;
+
+      if (cats.ok) {
+        setCategories(cats.data);
+      }
 
       const merged: ReceiptDraft | null =
         remote.ok && remote.data
@@ -99,7 +106,6 @@ export default function OcrReviewPage({
 
       if (merged) {
         setDraft(merged);
-        setAmountEuro(centsToEurInput(merged.ocrAmountCents));
         saveReceiptDraft(merged);
       }
       setLoading(false);
@@ -109,40 +115,47 @@ export default function OcrReviewPage({
     };
   }, [id]);
 
-  const operatorCents = useMemo(
-    () => parseEurInputToCents(amountEuro),
-    [amountEuro],
-  );
-
-  const amountsDiffer =
-    draft?.ocrAmountCents != null &&
-    operatorCents != null &&
-    draft.ocrAmountCents !== operatorCents;
-
-  function continueNext() {
+  async function confirmExpense() {
     setError(null);
     if (!draft) {
       setError("Δεν βρέθηκε πρόχειρη απόδειξη. Ανεβάστε ξανά.");
       return;
     }
-    if (operatorCents == null || operatorCents <= 0) {
-      setError("Καταχωρίστε έγκυρο ποσό σε ευρώ.");
+    if (draft.ocrAmountCents == null || draft.ocrAmountCents <= 0) {
+      setError("Λείπει ποσό OCR. Ανεβάστε ξανά ή δοκιμάστε νέο ανέβασμα.");
+      return;
+    }
+    if (draft.status !== "READY") {
+      setError("Η απόδειξη πρέπει να είναι Έτοιμη πριν την καταχώριση.");
+      return;
+    }
+    if (!category) {
+      setError("Επιλέξτε κατηγορία δαπάνης.");
       return;
     }
 
-    const qs = new URLSearchParams({
-      amountCents: String(operatorCents),
+    setSubmitting(true);
+    const result = await createTransaction({
       buildingId: draft.buildingId,
-      description: description.trim(),
+      type: "EXPENSE",
+      amountCents: draft.ocrAmountCents,
+      occurredAt: new Date().toISOString(),
+      receiptId: draft.receiptId ?? draft.id,
+      categoryId: category,
+      description: description.trim() || undefined,
     });
-    if (draft.ocrAmountCents != null) {
-      qs.set("ocrAmountCents", String(draft.ocrAmountCents));
-    }
-    if (!amountsDiffer) {
-      qs.set("matched", "1");
+    setSubmitting(false);
+
+    if (!result.ok) {
+      setError(
+        result.pending
+          ? "Το API καταχώρισης κινήσεων δεν είναι ακόμη διαθέσιμο."
+          : result.message,
+      );
+      return;
     }
 
-    router.push(`/receipts/${id}/justify?${qs.toString()}`);
+    router.push(`/buildings/${draft.buildingId}/expenses`);
   }
 
   if (loading) {
@@ -181,12 +194,11 @@ export default function OcrReviewPage({
       <PageHeader
         eyebrow="Καταχώριση δαπάνης"
         title="Έλεγχος OCR"
-        description="Επιβεβαιώστε τα πεδία που διαβάστηκαν αυτόματα πριν την καταχώριση."
+        description="Επιβεβαιώστε το ποσό της απόδειξης. Δεν επεξεργάζεστε ποσό — μόνο σωστό / λάθος OCR."
       />
 
       <ReceiptSteps current={1} />
 
-      {/* Machine reading — read-only evidence. */}
       <section
         className="rise panel p-6"
         style={{ "--rise-delay": "80ms" } as React.CSSProperties}
@@ -239,45 +251,36 @@ export default function OcrReviewPage({
         </dl>
       </section>
 
-      {operatorCents != null ? (
-        <MismatchBanner
-          ocrAmountCents={draft.ocrAmountCents}
-          operatorAmountCents={operatorCents}
-        />
-      ) : null}
-
-      {/* Human confirmation — the operator's own numbers. */}
       <section
         className="rise flex flex-col gap-6"
         style={{ "--rise-delay": "140ms" } as React.CSSProperties}
-        aria-labelledby="operator-heading"
+        aria-labelledby="confirm-heading"
       >
         <h2
-          id="operator-heading"
+          id="confirm-heading"
           className="font-display text-lg font-bold text-ink"
         >
-          Επιβεβαίωση χειριστή
+          Καταχώριση δαπάνης
         </h2>
 
         <Field
-          htmlFor={amountId}
-          label="Ποσό χειριστή (EUR)"
-          hint={
-            <>
-              Καταχωρίζεται σε ευρώ και αποθηκεύεται σε ακέραια λεπτά.
-              Προεπισκόπηση: <MoneyText cents={operatorCents} />
-            </>
-          }
+          htmlFor={categoryId}
+          label="Κατηγορία"
+          hint="Επιλέξτε πού θα χρεωθεί η δαπάνη στα κοινόχρηστα."
         >
-          <input
-            id={amountId}
-            type="text"
-            inputMode="decimal"
-            value={amountEuro}
-            onChange={(e) => setAmountEuro(e.target.value)}
-            aria-describedby={`${amountId}-hint`}
-            className={`${inputStyles} font-mono-amounts max-w-xs text-lg`}
-          />
+          <select
+            id={categoryId}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className={inputStyles}
+          >
+            <option value="">— Επιλογή —</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </Field>
 
         <Field
@@ -304,10 +307,22 @@ export default function OcrReviewPage({
           </p>
         ) : null}
 
-        <div>
-          <Button type="button" size="lg" onClick={continueNext}>
-            {amountsDiffer ? "Συνέχεια σε αιτιολόγηση" : "Συνέχεια σε καταχώριση"}
+        <div className="flex flex-wrap items-center gap-4">
+          <Button
+            type="button"
+            size="lg"
+            loading={submitting}
+            loadingLabel="Καταχώριση…"
+            onClick={confirmExpense}
+          >
+            Επιβεβαίωση &amp; δημιουργία δαπάνης
           </Button>
+          <Link
+            href="/receipts/upload"
+            className={buttonStyles("secondary", "lg")}
+          >
+            Λάθος OCR — νέο ανέβασμα
+          </Link>
         </div>
       </section>
     </div>
