@@ -43,12 +43,22 @@ export type ApartmentStatement = {
   lines: AllocatedLine[];
 };
 
+/** How HEATING_SHARES expenses were weighted for this statement. */
+export type HeatingAllocationMode = "FIXED_SHARES" | "METER_UNITS";
+
 export type KoinoxristaStatement = {
   totalExpenseCents: number;
   skippedManualCents: number;
   skippedUncategorizedCents: number;
   apartmentStatements: ApartmentStatement[];
   lines: AllocatedLine[];
+  /** FIXED_SHARES = heatingShareBps; METER_UNITS = period consumption weights. */
+  heatingAllocationMode: HeatingAllocationMode;
+  /**
+   * Apartment labels with heatingShareBps > 0 but no meter reading row
+   * when meter mode is active (treated as 0 consumption). Empty in FIXED_SHARES.
+   */
+  missingHeatingReadingLabels: string[];
 };
 
 /**
@@ -98,18 +108,32 @@ export function allocateByWeights(
   return result;
 }
 
+export type SharesForMethodOptions = {
+  /**
+   * When set (meter mode for the period), HEATING_SHARES uses these integer units.
+   * Missing apartment id → 0. Omit / undefined → fall back to heatingShareBps.
+   */
+  heatingMeterUnitsByApartmentId?: ReadonlyMap<string, number> | null;
+};
+
 export function sharesForMethod(
   apt: ApartmentShares,
   method: AllocationMethod,
   apartmentCount: number,
+  opts?: SharesForMethodOptions,
 ): number {
   switch (method) {
     case "GENERAL_SHARES":
       return apt.shareBps;
     case "ELEVATOR_SHARES":
       return apt.elevatorShareBps;
-    case "HEATING_SHARES":
+    case "HEATING_SHARES": {
+      const meters = opts?.heatingMeterUnitsByApartmentId;
+      if (meters) {
+        return meters.get(apt.id) ?? 0;
+      }
       return apt.heatingShareBps;
+    }
     case "EQUAL":
       return apartmentCount > 0 ? 1 : 0;
     case "MANUAL":
@@ -130,12 +154,31 @@ function bucketKey(categoryId: string | null, method: AllocationMethod): BucketK
 /**
  * Build a monthly κοινόχρηστα statement from EXPENSE rows + apartment χιλιοστά.
  * MANUAL and uncategorized expenses are skipped (counted in skip totals).
+ *
+ * Heating demo formula:
+ * - If `heatingMeterUnitsByApartmentId` is provided (any readings for period),
+ *   HEATING_SHARES expenses allocate by **pure consumption units** via
+ *   allocateByWeights (Hamilton / largest-remainder). Missing apt → 0.
+ * - Otherwise fall back to static heatingShareBps.
  */
 export function buildKoinoxristaStatement(input: {
   apartments: ApartmentShares[];
   expenses: ExpenseForAllocation[];
+  /** Non-null map activates meter mode for HEATING_SHARES (even if some units are 0). */
+  heatingMeterUnitsByApartmentId?: ReadonlyMap<string, number> | null;
 }): KoinoxristaStatement {
   const { apartments, expenses } = input;
+  const meterMap = input.heatingMeterUnitsByApartmentId ?? null;
+  const heatingAllocationMode: HeatingAllocationMode = meterMap
+    ? "METER_UNITS"
+    : "FIXED_SHARES";
+  const missingHeatingReadingLabels =
+    meterMap != null
+      ? apartments
+          .filter((a) => a.heatingShareBps > 0 && !meterMap.has(a.id))
+          .map((a) => a.label)
+      : [];
+
   if (apartments.length === 0) {
     return {
       totalExpenseCents: 0,
@@ -143,12 +186,17 @@ export function buildKoinoxristaStatement(input: {
       skippedUncategorizedCents: 0,
       apartmentStatements: [],
       lines: [],
+      heatingAllocationMode,
+      missingHeatingReadingLabels: [],
     };
   }
 
   let skippedManualCents = 0;
   let skippedUncategorizedCents = 0;
   let totalExpenseCents = 0;
+  const shareOpts: SharesForMethodOptions = {
+    heatingMeterUnitsByApartmentId: meterMap,
+  };
 
   type Bucket = {
     categoryId: string | null;
@@ -193,7 +241,12 @@ export function buildKoinoxristaStatement(input: {
 
   for (const bucket of buckets.values()) {
     const weights = apartments.map((a) =>
-      sharesForMethod(a, bucket.allocationMethod, apartments.length),
+      sharesForMethod(
+        a,
+        bucket.allocationMethod,
+        apartments.length,
+        shareOpts,
+      ),
     );
     const parts = allocateByWeights(bucket.amountCents, weights);
     const weightSum = weights.reduce((a, b) => a + b, 0);
@@ -201,7 +254,7 @@ export function buildKoinoxristaStatement(input: {
     apartments.forEach((apt, i) => {
       const amountCents = parts[i]!;
       if (amountCents === 0 && weights[i] === 0) {
-        // Still record zero lines only when unit participates? Skip pure zeros for clarity.
+        // Skip pure zeros for clarity.
         return;
       }
       const shareUsedBps =
@@ -245,6 +298,8 @@ export function buildKoinoxristaStatement(input: {
     skippedUncategorizedCents,
     apartmentStatements: apartments.map((a) => byApartment.get(a.id)!),
     lines,
+    heatingAllocationMode,
+    missingHeatingReadingLabels,
   };
 }
 

@@ -10,6 +10,8 @@
 | `/buildings/[id]/koinoxrista` | Monthly κοινόχρηστα preview + finalize |
 | `/buildings/[id]/collections` | Εισπράξεις — paid vs open + demo pay |
 | `/buildings/[id]/shares` | Χιλιοστά + category allocation keys |
+| `/buildings/[id]/meters` | Ενδείξεις θέρμανσης (period meter units) |
+| `/buildings/[id]/koinoxrista` | Period preview + finalize |
 | `/alerts` | Alerts inbox |
 | `/portal/[token]` | Owner demo portal (public magic link) |
 

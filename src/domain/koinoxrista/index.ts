@@ -10,7 +10,9 @@ export {
   type ApartmentShares,
   type ApartmentStatement,
   type ExpenseForAllocation,
+  type HeatingAllocationMode,
   type KoinoxristaStatement,
+  type SharesForMethodOptions,
 } from "./allocate";
 export {
   KoinoxristaError,

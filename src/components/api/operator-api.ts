@@ -13,6 +13,7 @@ import type {
   CreateTransactionResponse,
   ExpenseCategoryItem,
   KoinoxristaPreview,
+  MeterReadingsResponse,
   PatchAlertBody,
   PayChargeResponse,
   PortalPayload,
@@ -31,6 +32,31 @@ export const SEED_BUILDINGS: BuildingSummary[] = [
     id: "seed-building-kolonaki",
     name: "Κολωνάκι 12",
     address: "Σκουφά 12, Αθήνα",
+  },
+  {
+    id: "seed-building-pangrati",
+    name: "Παγκράτι 8",
+    address: "Υμηττού 8, Αθήνα",
+  },
+  {
+    id: "seed-building-kypseli",
+    name: "Κυψέλη 22",
+    address: "Πατησίων 22, Αθήνα",
+  },
+  {
+    id: "seed-building-glyfada",
+    name: "Γλυφάδα 5",
+    address: "Γρ. Λαμπράκη 5, Γλυφάδα",
+  },
+  {
+    id: "seed-building-thessaloniki",
+    name: "Θεσσαλονίκη — Τσιμισκή 40",
+    address: "Τσιμισκή 40, Θεσσαλονίκη",
+  },
+  {
+    id: "seed-building-patra",
+    name: "Πάτρα — Ρήγα Φεραίου 15",
+    address: "Ρήγα Φεραίου 15, Πάτρα",
   },
 ];
 
@@ -589,6 +615,68 @@ export async function finalizeKoinoxrista(
       chargeTransactionIds: string[];
     };
     return { ok: true, data };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export async function fetchMeterReadings(
+  buildingId: string,
+  year: number,
+  month: number,
+): Promise<ApiResult<MeterReadingsResponse | null>> {
+  try {
+    const res = await fetch(
+      `/api/buildings/${buildingId}/meter-readings?year=${year}&month=${month}`,
+      { method: "GET" },
+    );
+    if (!res.ok) {
+      const body = await parseJsonSafe(res);
+      return failureFromStatus(res.status, body, null, "Ενδείξεις API");
+    }
+    const data = (await parseJsonSafe(res)) as MeterReadingsResponse;
+    return { ok: true, data };
+  } catch {
+    return errorResult(null, "Αποτυχία σύνδεσης με το API ενδείξεων");
+  }
+}
+
+export async function putMeterReadings(
+  buildingId: string,
+  year: number,
+  month: number,
+  readings: Array<{ apartmentId: string; units: number }>,
+): Promise<ApiResult<{ year: number; month: number; count: number } | null>> {
+  try {
+    const res = await fetch(`/api/buildings/${buildingId}/meter-readings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ year, month, readings }),
+    });
+    if (res.status === 404 || res.status === 501) {
+      return pendingResult(null);
+    }
+    if (!res.ok) {
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Save failed (${res.status})`;
+      return errorResult(null, message);
+    }
+    const data = (await parseJsonSafe(res)) as {
+      year: number;
+      month: number;
+      readings: unknown[];
+    };
+    return {
+      ok: true,
+      data: {
+        year: data.year,
+        month: data.month,
+        count: data.readings?.length ?? readings.length,
+      },
+    };
   } catch {
     return pendingResult(null);
   }

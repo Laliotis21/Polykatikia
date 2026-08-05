@@ -23,10 +23,28 @@ Internal summary guiding Polykatikia allocation. Practice varies by **κανον
 | Elevator operating / maintenance | Χιλιοστά ανελκυστήρα (floor-weighted; GF often 0 for ops) | `ELEVATOR_SHARES` |
 | Elevator replacement / capital works | Often γενικά or ownership shares per κανονισμός | configurable |
 | Central heating (no autonomy meters) | Χιλιοστά θέρμανσης (ΠΔ 27-09-1985 study) | `HEATING_SHARES` |
-| Heating with autonomy (ωρομέτρηση / θερμιδομέτρηση) | Fixed ei/fi × hours/calories (period-varying) | future; v1 uses fixed heating shares |
+| Heating with autonomy (ωρομέτρηση / θερμιδομέτρηση) | Period **meter units** (demo) or fixed ei/fi × hours | `HEATING_SHARES` + `HeatingMeterReading` when present |
 | Hot water / shared boiler | Own key or heating / general | configurable |
 | Equal split (rare, if κανονισμός says so) | 1/N | `EQUAL` |
 | Manual / one-off assignment | Operator assigns | `MANUAL` (excluded from auto period allocation) |
+
+## Heating meter readings (ενδείξεις) — demo v1
+
+Model: `HeatingMeterReading` — `(apartmentId, year, month)` unique, `units` integer (hours / ticks / demo units; **no floats**).
+
+**Allocation rule for `HEATING_SHARES` expenses:**
+
+1. If **any** reading exists for `buildingId + year + month` → **pure consumption weights**:
+   - weight(apartment) = `units` (missing row → **0**).
+   - Split expense cents with `allocateByWeights` (Hamilton / largest-remainder).
+   - Apartment with `units = 0` gets €0 of that heating bucket.
+2. Else → fall back to static `heatingShareBps` (πίνακας χιλιοστών).
+
+Optional later: blend fixed shares × meters (κανονισμός ei/fi). Demo prefers pure meters when present.
+
+UI: `/buildings/[id]/meters` · API: `GET|PUT /api/buildings/[id]/meter-readings?year=&month=`.
+
+Seed (Κολωνάκι, Ιαν 2026): Α1=5, Α2=20, Β1=50, Β2=10 + heating expense `seed-tx-heating-jan-2026` (125 000 ¢).
 
 ## Who pays
 

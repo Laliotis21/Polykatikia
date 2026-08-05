@@ -2,7 +2,7 @@
 
 ## 5′ script (hosted / already seeded)
 
-Seed προ-οριστικοποιεί **Αύγουστο 2026** + **Ιανουάριο 2026** και σημαδεύει **Α1 (Μαρία) ως Paid**. Δεν χρειάζεται κλικ Οριστικοποίηση για άδειες οθόνες.
+Seed προ-οριστικοποιεί **όλο το 2026** (όλα τα κτίρια), σημαδεύει **Α1 (Μαρία) Aug ως Paid**, και για **Κολωνάκι Ιαν 2026** βάζει ενδείξεις θέρμανσης. Δεν χρειάζεται κλικ Οριστικοποίηση για άδειες οθόνες.
 
 1. **Operator login:**
    - **Hosted demo (recommended):** set Vercel env `DEMO_AUTH_EMAIL=admin@polykatoikia.local` (must exist in seeded `User`). Opens dashboard without Supabase password — **demo only**.
@@ -10,10 +10,12 @@ Seed προ-οριστικοποιεί **Αύγουστο 2026** + **Ιανου�
    - **Local without Supabase:** `DEMO_AUTH_EMAIL=admin@polykatoikia.local` in `.env`.
 2. **Κτίριο:** Κολωνάκι 12 → `/buildings/seed-building-kolonaki`
 3. **Χιλιοστά:** `/buildings/seed-building-kolonaki/shares` — 4 διαμερίσματα με shares.
-4. **Κοινόχρηστα:** `/buildings/seed-building-kolonaki/koinoxrista` → μήνας **08/2026** — ήδη FINALIZED (προβολή statement / charges). If you see «Το API δεν είναι ακόμη διαθέσιμο», that badge is only for HTTP 501 — 401/404 now show the real error (σύνδεση / κτίριο).
-5. **Εισπράξεις:** `/buildings/seed-building-kolonaki/collections` → Α1 **Paid**, Α2/Β1/Β2 **Open**.
-6. **Portal (open charge):** `/portal/demo-portal-giannis` → **Πληρωμή (demo)** → ξαναφόρτωσε Εισπράξεις (Α2 πράσινο).
-7. **Portal (already paid):** `/portal/demo-portal-maria` — χρέωση Αυγούστου ήδη πληρωμένη.
+4. **Ενδείξεις (θέρμανση):** `/buildings/seed-building-kolonaki/meters` → μήνας **01/2026** — Α1=5, Α2=20, Β1=50, Β2=10. Badge «Κατανομή: ενδείξεις».
+5. **Κοινόχρηστα (μετρητές):** `/buildings/seed-building-kolonaki/koinoxrista` → μήνας **01/2026** — FINALIZED· γραμμές **Θέρμανση** κατά βάρη κατανάλωσης (όχι μόνο χιλιοστά). Badge «Θέρμανση: ενδείξεις».
+6. **Κοινόχρηστα (σταθερά shares):** μήνας **08/2026** — χωρίς ενδείξεις· Θέρμανση δεν υπάρχει (καλοκαίρι)· γενικά/ανελκυστήρας από χιλιοστά. FINALIZED.
+7. **Εισπράξεις:** `/buildings/seed-building-kolonaki/collections` → φίλτρο Aug · Α1 **Paid**, Α2/Β1/Β2 **Open**.
+8. **Portal (open charge):** `/portal/demo-portal-giannis` → **Πληρωμή (demo)** → ξαναφόρτωσε Εισπράξεις (Α2 πράσινο).
+9. **Portal (already paid):** `/portal/demo-portal-maria` — χρέωση Αυγούστου ήδη πληρωμένη.
 
 Optional: OCR path (`/receipts/upload`) για integrity story.
 
@@ -23,8 +25,8 @@ Optional: OCR path (`/receipts/upload`) για integrity story.
 npx prisma migrate deploy && npm run db:seed
 ```
 
-- Vercel build τρέχει `prisma migrate deploy` — migration `ensure_seed_kolonaki_apartments` upserts κτίριο + 4 διαμερίσματα.
-- `npm run db:seed` upserts owners/portalTokens, categories, Aug expenses, finalizes Jan+Aug, pays Α1.
+- Vercel build τρέχει `prisma migrate deploy` — migrations upsert κτίριο + διαμερίσματα + `HeatingMeterReading` table.
+- `npm run db:seed` upserts owners/portalTokens, categories, monthly expenses, Jan meter readings (Κολωνάκι), finalizes all months, pays Α1 Aug.
 
 ## Portal tokens
 

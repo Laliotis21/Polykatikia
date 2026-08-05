@@ -77,12 +77,13 @@ model Building {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  apartments     Apartment[]
-  transactions   Transaction[]
-  receipts       Receipt[]
-  alerts         Alert[]
-  dunningNotices DunningNotice[]
-  settlements    CommonExpenseSettlement[]
+  apartments           Apartment[]
+  transactions         Transaction[]
+  receipts             Receipt[]
+  alerts               Alert[]
+  dunningNotices       DunningNotice[]
+  settlements          CommonExpenseSettlement[]
+  heatingMeterReadings HeatingMeterReading[]
 }
 
 model Apartment {
@@ -94,17 +95,38 @@ model Apartment {
   shareBps         Int
   /// Χιλιοστά ανελκυστήρα (0 = exempt for that key).
   elevatorShareBps Int      @default(0)
-  /// Χιλιοστά θέρμανσης (static key; autonomy meters are a later extension).
+  /// Χιλιοστά θέρμανσης (static key when no period meter readings).
   heatingShareBps  Int      @default(0)
   /// Floor index for display / future floor-weight helpers (0 = ισόγειο).
   floor            Int?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  owners          ApartmentOwner[]
-  transactions    Transaction[]
-  dunningNotices  DunningNotice[]
-  settlementLines CommonExpenseSettlementLine[]
+  owners               ApartmentOwner[]
+  transactions         Transaction[]
+  dunningNotices       DunningNotice[]
+  settlementLines      CommonExpenseSettlementLine[]
+  heatingMeterReadings HeatingMeterReading[]
+}
+
+/// Period heating consumption (ωρομέτρηση / meter units). Integer units only — no floats.
+/// When any reading exists for building+year+month, HEATING_SHARES expenses allocate by
+/// these units (missing apartment → 0). Otherwise fall back to heatingShareBps.
+model HeatingMeterReading {
+  id          String    @id @default(cuid())
+  buildingId  String
+  building    Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  apartmentId String
+  apartment   Apartment @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
+  year        Int
+  month       Int
+  /// Consumption weight for the period (e.g. hours, ticks, or demo “units”).
+  units       Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([apartmentId, year, month])
+  @@index([buildingId, year, month])
 }
 
 model Owner {

@@ -17,6 +17,9 @@ describe("assertSafeBuildingId", () => {
     expect(assertSafeBuildingId("seed-building-kolonaki")).toBe(
       "seed-building-kolonaki",
     );
+    expect(assertSafeBuildingId("seed-building-pangrati")).toBe(
+      "seed-building-pangrati",
+    );
   });
 
   it("rejects path traversal and separators", () => {

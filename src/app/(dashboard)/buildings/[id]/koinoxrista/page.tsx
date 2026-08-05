@@ -2,7 +2,7 @@
 
 import { use, useEffect, useId, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Calculator, Check, Scale, Wallet } from "lucide-react";
+import { Calculator, Check, Gauge, Scale, Wallet } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -114,6 +114,13 @@ export default function KoinoxristaPage({
         actions={
           <>
             <Link
+              href={`/buildings/${id}/meters`}
+              className={buttonStyles("secondary")}
+            >
+              <Gauge className="size-4" aria-hidden strokeWidth={2} />
+              Ενδείξεις
+            </Link>
+            <Link
               href={`/buildings/${id}/shares`}
               className={buttonStyles("secondary")}
             >
@@ -177,6 +184,15 @@ export default function KoinoxristaPage({
             Περίοδος οριστικοποιημένη
           </Badge>
         ) : null}
+        {preview?.statement.heatingAllocationMode === "METER_UNITS" ? (
+          <Badge tone="primary" className="mb-3">
+            Θέρμανση: ενδείξεις
+          </Badge>
+        ) : preview ? (
+          <Badge tone="neutral" className="mb-3">
+            Θέρμανση: χιλιοστά
+          </Badge>
+        ) : null}
       </section>
 
       {error ? (
@@ -193,6 +209,19 @@ export default function KoinoxristaPage({
           className="rounded-md border border-[color-mix(in_srgb,var(--success)_30%,white)] bg-[var(--success-soft)] px-3 py-2.5 text-sm font-medium text-[var(--success)]"
         >
           {success}
+        </p>
+      ) : null}
+      {preview?.statement.missingHeatingReadingLabels &&
+      preview.statement.missingHeatingReadingLabels.length > 0 ? (
+        <p
+          role="status"
+          className="rounded-md border border-brass-200 bg-[var(--warning-soft)] px-3 py-2.5 text-sm text-[var(--warning)]"
+        >
+          Ενδείξεις θέρμανσης: χωρίς καταχώρηση (0) για{" "}
+          {preview.statement.missingHeatingReadingLabels.join(", ")}.{" "}
+          <Link href={`/buildings/${id}/meters`} className="underline">
+            Επεξεργασία ενδείξεων
+          </Link>
         </p>
       ) : null}
 

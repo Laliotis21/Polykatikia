@@ -170,7 +170,28 @@ export type KoinoxristaPreview = {
     skippedUncategorizedCents: number;
     apartmentStatements: KoinoxristaApartmentStatement[];
     lines: KoinoxristaLine[];
+    heatingAllocationMode?: "FIXED_SHARES" | "METER_UNITS";
+    missingHeatingReadingLabels?: string[];
   };
+};
+
+export type MeterReadingRow = {
+  apartmentId: string;
+  label: string;
+  heatingShareBps: number;
+  floor: number | null;
+  units: number | null;
+  readingId: string | null;
+  updatedAt: string | null;
+};
+
+export type MeterReadingsResponse = {
+  building: { id: string; name: string };
+  year: number;
+  month: number;
+  hasAnyReading: boolean;
+  missingLabels: string[];
+  rows: MeterReadingRow[];
 };
 
 export type CollectionRow = {

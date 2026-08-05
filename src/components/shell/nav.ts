@@ -3,6 +3,7 @@ import {
   Building2,
   Calculator,
   FileUp,
+  Gauge,
   LayoutDashboard,
   ReceiptText,
   Scale,
@@ -95,7 +96,7 @@ export function buildingScopedHref(
   buildingId: string,
 ): string {
   const leaf = pathname.match(
-    /^\/buildings\/[^/]+\/(expenses|koinoxrista|shares|collections)/,
+    /^\/buildings\/[^/]+\/(expenses|koinoxrista|shares|collections|meters)/,
   )?.[1];
   return `/buildings/${buildingId}/${leaf ?? "expenses"}`;
 }
@@ -147,6 +148,12 @@ export function navGroups(buildingId: string): NavGroup[] {
           isActive: (p) => p.endsWith("/koinoxrista"),
         },
         {
+          href: `/buildings/${buildingId}/meters`,
+          label: "Ενδείξεις",
+          icon: Gauge,
+          isActive: (p) => p.endsWith("/meters"),
+        },
+        {
           href: `/buildings/${buildingId}/collections`,
           label: "Εισπράξεις",
           icon: Wallet,
@@ -175,6 +182,7 @@ const TITLES: Array<{ match: (p: string) => boolean; title: string }> = [
   },
   { match: (p) => p.endsWith("/expenses"), title: "Έξοδα κτιρίου" },
   { match: (p) => p.endsWith("/koinoxrista"), title: "Κοινόχρηστα" },
+  { match: (p) => p.endsWith("/meters"), title: "Ενδείξεις θέρμανσης" },
   { match: (p) => p.endsWith("/collections"), title: "Εισπράξεις" },
   { match: (p) => p.endsWith("/shares"), title: "Χιλιοστά & επαφές" },
   { match: (p) => p.startsWith("/alerts"), title: "Ειδοποιήσεις" },

@@ -41,7 +41,7 @@ async function loadPeriodInputs(
   const { buildingId, year, month } = input;
   const { from, to } = monthAthensRange(year, month);
 
-  const [apartments, expenses, existing] = await Promise.all([
+  const [apartments, expenses, existing, meterRows] = await Promise.all([
     db.apartment.findMany({
       where: { buildingId },
       orderBy: { label: "asc" },
@@ -82,7 +82,17 @@ async function loadPeriodInputs(
         finalizedAt: true,
       },
     }),
+    db.heatingMeterReading.findMany({
+      where: { buildingId, year, month },
+      select: { apartmentId: true, units: true },
+    }),
   ]);
+
+  // Any reading for the period → meter mode (missing apt → 0). Else fixed heatingShareBps.
+  const heatingMeterUnitsByApartmentId =
+    meterRows.length > 0
+      ? new Map(meterRows.map((r) => [r.apartmentId, r.units]))
+      : null;
 
   const statement = buildKoinoxristaStatement({
     apartments,
@@ -95,6 +105,7 @@ async function loadPeriodInputs(
       categoryName: e.category?.name ?? null,
       categoryCode: e.category?.code ?? null,
     })),
+    heatingMeterUnitsByApartmentId,
   });
 
   return { from, to, apartments, expenses, existing, statement };
