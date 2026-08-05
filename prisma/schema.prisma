@@ -71,11 +71,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  transactions   Transaction[]              @relation("CreatedBy")
-  auditLogs      AuditLog[]
-  receipts       Receipt[]                  @relation("ReceiptCreator")
-  resolvedAlerts Alert[]                    @relation("ResolvedBy")
-  settlements    CommonExpenseSettlement[]  @relation("SettlementCreator")
+  transactions       Transaction[]              @relation("CreatedBy")
+  auditLogs          AuditLog[]
+  receipts           Receipt[]                  @relation("ReceiptCreator")
+  resolvedAlerts     Alert[]                    @relation("ResolvedBy")
+  settlements        CommonExpenseSettlement[]  @relation("SettlementCreator")
+  recurringExpenses  RecurringExpense[]         @relation("RecurringExpenseCreator")
 }
 
 model Building {
@@ -94,6 +95,7 @@ model Building {
   dunningNotices       DunningNotice[]
   settlements          CommonExpenseSettlement[]
   heatingMeterReadings HeatingMeterReading[]
+  recurringExpenses    RecurringExpense[]
 }
 
 model Apartment {
@@ -171,8 +173,30 @@ model ExpenseCategory {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  transactions    Transaction[]
-  settlementLines CommonExpenseSettlementLine[]
+  transactions      Transaction[]
+  settlementLines   CommonExpenseSettlementLine[]
+  recurringExpenses RecurringExpense[]
+}
+
+/// ADMIN-defined πάγιο template. Amount is config; OPERATOR may only toggle `active`.
+model RecurringExpense {
+  id          String          @id @default(cuid())
+  buildingId  String
+  building    Building        @relation(fields: [buildingId], references: [id])
+  categoryId  String
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id])
+  label       String
+  amountCents Int
+  /// 1–28 — avoid month-end edge cases.
+  dayOfMonth  Int             @default(1)
+  active      Boolean         @default(true)
+  createdById String
+  createdBy   User            @relation("RecurringExpenseCreator", fields: [createdById], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  transactions Transaction[]
+
+  @@index([buildingId, active])
 }
 
 model CommonExpenseSettlement {
@@ -221,6 +245,12 @@ model Transaction {
   /// Links CHARGE rows minted by a κοινόχρηστα settlement (null for other txs).
   settlementId          String?
   settlement            CommonExpenseSettlement? @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  /// Links EXPENSE minted from a πάγιο template (null for ad-hoc / receipt txs).
+  recurringExpenseId    String?
+  recurringExpense      RecurringExpense?        @relation(fields: [recurringExpenseId], references: [id])
+  /// Period stamp for recurring mints — unique with recurringExpenseId.
+  recurringPeriodYear   Int?
+  recurringPeriodMonth  Int?
   type                  TransactionType
   amountCents           Int
   description           String?
@@ -239,6 +269,7 @@ model Transaction {
   updatedAt             DateTime                 @updatedAt
   alerts                Alert[]
 
+  @@unique([recurringExpenseId, recurringPeriodYear, recurringPeriodMonth])
   @@index([settlementId])
 }
 
