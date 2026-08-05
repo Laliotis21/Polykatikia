@@ -55,7 +55,10 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (isDashboardPath(request.nextUrl.pathname) && !user) {
+  // DEMO_AUTH_EMAIL unlocks dashboard without a Supabase session (hosted demos).
+  const demoAuth = Boolean(process.env.DEMO_AUTH_EMAIL?.trim());
+
+  if (isDashboardPath(request.nextUrl.pathname) && !user && !demoAuth) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";

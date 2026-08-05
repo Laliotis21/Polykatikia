@@ -201,8 +201,11 @@ export default function KoinoxristaPage({
       ) : !preview ? (
         <EmptyState
           icon={Calculator}
-          title="Δεν υπάρχει προεπισκόπηση"
-          description="Ελέγξτε ότι το κτίριο έχει διαμερίσματα και ότι υπάρχουν δαπάνες για την επιλεγμένη περίοδο."
+          title={error ? "Αποτυχία φόρτωσης" : "Δεν υπάρχει προεπισκόπηση"}
+          description={
+            error ??
+            "Ελέγξτε ότι το κτίριο έχει διαμερίσματα και ότι υπάρχουν δαπάνες για την επιλεγμένη περίοδο."
+          }
           pending={pending}
         />
       ) : (

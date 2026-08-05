@@ -4,10 +4,13 @@
 
 Seed προ-οριστικοποιεί **Αύγουστο 2026** + **Ιανουάριο 2026** και σημαδεύει **Α1 (Μαρία) ως Paid**. Δεν χρειάζεται κλικ Οριστικοποίηση για άδειες οθόνες.
 
-1. **Operator login:** `DEMO_AUTH_EMAIL=admin@polykatoikia.local` (local) ή Supabase session στο hosted.
+1. **Operator login:**
+   - **Hosted demo (recommended):** set Vercel env `DEMO_AUTH_EMAIL=admin@polykatoikia.local` (must exist in seeded `User`). Opens dashboard without Supabase password — **demo only**.
+   - **Or** Supabase Auth: create user `admin@polykatoikia.local` in the project linked to `NEXT_PUBLIC_SUPABASE_*`, then `/login` with that password. Prisma `User` row must match the Auth email.
+   - **Local without Supabase:** `DEMO_AUTH_EMAIL=admin@polykatoikia.local` in `.env`.
 2. **Κτίριο:** Κολωνάκι 12 → `/buildings/seed-building-kolonaki`
 3. **Χιλιοστά:** `/buildings/seed-building-kolonaki/shares` — 4 διαμερίσματα με shares.
-4. **Κοινόχρηστα:** `/buildings/seed-building-kolonaki/koinoxrista` → μήνας **08/2026** — ήδη FINALIZED (προβολή statement / charges).
+4. **Κοινόχρηστα:** `/buildings/seed-building-kolonaki/koinoxrista` → μήνας **08/2026** — ήδη FINALIZED (προβολή statement / charges). If you see «Το API δεν είναι ακόμη διαθέσιμο», that badge is only for HTTP 501 — 401/404 now show the real error (σύνδεση / κτίριο).
 5. **Εισπράξεις:** `/buildings/seed-building-kolonaki/collections` → Α1 **Paid**, Α2/Β1/Β2 **Open**.
 6. **Portal (open charge):** `/portal/demo-portal-giannis` → **Πληρωμή (demo)** → ξαναφόρτωσε Εισπράξεις (Α2 πράσινο).
 7. **Portal (already paid):** `/portal/demo-portal-maria` — χρέωση Αυγούστου ήδη πληρωμένη.

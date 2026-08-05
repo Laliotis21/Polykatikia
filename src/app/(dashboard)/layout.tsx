@@ -4,8 +4,8 @@ import { AppShell } from "@/components/shell/AppShell";
 import { getSessionUser } from "@/lib/auth";
 
 /**
- * Dashboard shell. When Supabase public config is present, require a session
- * (aligns with proxy + `getSessionUser` / API AuthZ).
+ * Dashboard shell. Require a resolved session via `getSessionUser`
+ * (Supabase cookie and/or `DEMO_AUTH_EMAIL` fallback). Aligns with proxy AuthZ.
  */
 export default async function DashboardLayout({
   children,
@@ -14,13 +14,13 @@ export default async function DashboardLayout({
 }) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const demoAuth = Boolean(process.env.DEMO_AUTH_EMAIL?.trim());
 
-  let user = null;
-  if (url && anon) {
-    user = await getSessionUser();
-    if (!user) {
-      redirect("/");
-    }
+  // When neither Supabase nor demo auth is configured, allow local shell
+  // (APIs still return 401 until DEMO_AUTH_EMAIL or Supabase is set).
+  const user = await getSessionUser();
+  if (((url && anon) || demoAuth) && !user) {
+    redirect("/");
   }
 
   return (

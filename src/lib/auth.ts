@@ -27,31 +27,36 @@ export function canView(role: Role): boolean {
 }
 
 /**
+ * Demo operator when `DEMO_AUTH_EMAIL` matches a seeded Prisma `User`.
+ * Intended for local/hosted demos — anyone who can hit the app acts as that user.
+ */
+async function getDemoSessionUser(): Promise<SessionUser | null> {
+  const demoEmail = process.env.DEMO_AUTH_EMAIL?.trim();
+  if (!demoEmail) return null;
+  const dbUser = await prisma.user.findUnique({
+    where: { email: demoEmail },
+    select: { id: true, email: true, role: true },
+  });
+  if (!dbUser) return null;
+  return {
+    id: dbUser.id,
+    email: dbUser.email,
+    role: dbUser.role,
+  };
+}
+
+/**
  * Resolve the current operator from Supabase Auth cookies + Prisma `User`.
- * Returns null when Supabase public config is missing or session is absent.
+ * Returns null when session is absent and demo fallback does not apply.
  *
- * Demo fallback: when Supabase is unset and `DEMO_AUTH_EMAIL` matches a User,
- * return that user (local demos without Auth).
+ * Demo fallback: when `DEMO_AUTH_EMAIL` matches a User and there is no
+ * Supabase session (or Supabase public config is unset), return that user.
  */
 export async function getSessionUser(): Promise<SessionUser | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) {
-    const demoEmail = process.env.DEMO_AUTH_EMAIL?.trim();
-    if (demoEmail) {
-      const dbUser = await prisma.user.findUnique({
-        where: { email: demoEmail },
-        select: { id: true, email: true, role: true },
-      });
-      if (dbUser) {
-        return {
-          id: dbUser.id,
-          email: dbUser.email,
-          role: dbUser.role,
-        };
-      }
-    }
-    return null;
+    return getDemoSessionUser();
   }
 
   const cookieStore = await cookies();
@@ -73,23 +78,22 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   });
 
   const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user?.email) {
-    return null;
+  if (!error && data.user?.email) {
+    const dbUser = await prisma.user.findUnique({
+      where: { email: data.user.email },
+      select: { id: true, email: true, role: true },
+    });
+    if (dbUser) {
+      return {
+        id: dbUser.id,
+        email: dbUser.email,
+        role: dbUser.role,
+      };
+    }
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { email: data.user.email },
-    select: { id: true, email: true, role: true },
-  });
-  if (!dbUser) {
-    return null;
-  }
-
-  return {
-    id: dbUser.id,
-    email: dbUser.email,
-    role: dbUser.role,
-  };
+  // Hosted demo: Supabase configured but no (or unmatched) session.
+  return getDemoSessionUser();
 }
 
 export function requireRole(

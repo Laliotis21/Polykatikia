@@ -77,14 +77,53 @@ function errorResult<T>(data: T, message: string): ApiResult<T> {
   return { ok: false, pending: false, message, data };
 }
 
+function messageFromBody(body: unknown, fallback: string): string {
+  if (body && typeof body === "object" && "error" in body) {
+    const err = (body as { error: unknown }).error;
+    if (typeof err === "string" && err.trim()) return err;
+  }
+  return fallback;
+}
+
+/**
+ * Map HTTP failures. Only 501 = "API not implemented yet" (pending badge).
+ * 401/403/404/4xx/5xx surface as real errors — never mask as pending.
+ */
+function failureFromStatus<T>(
+  status: number,
+  body: unknown,
+  data: T,
+  label: string,
+): ApiResult<T> {
+  if (status === 501) {
+    return pendingResult(data, messageFromBody(body, `${label} ${status}`));
+  }
+  if (status === 401) {
+    return errorResult(
+      data,
+      messageFromBody(body, "Απαιτείται σύνδεση (Unauthorized)"),
+    );
+  }
+  if (status === 403) {
+    return errorResult(
+      data,
+      messageFromBody(body, "Δεν έχετε δικαίωμα πρόσβασης"),
+    );
+  }
+  return errorResult(data, messageFromBody(body, `${label} ${status}`));
+}
+
 export async function fetchBuildings(): Promise<ApiResult<BuildingSummary[]>> {
   try {
     const res = await fetch("/api/buildings", { method: "GET" });
-    if (res.status === 404 || res.status === 501) {
+    if (res.status === 501) {
       return pendingResult(SEED_BUILDINGS);
     }
     if (!res.ok) {
-      return pendingResult(SEED_BUILDINGS, `Buildings API ${res.status}`);
+      const body = await parseJsonSafe(res);
+      // Do not invent seed buildings on 401/404 — that sends operators to a
+      // fake id with empty shares / κοινόχρηστα.
+      return failureFromStatus(res.status, body, [] as BuildingSummary[], "Buildings API");
     }
     const json = (await parseJsonSafe(res)) as
       | BuildingSummary[]
@@ -95,8 +134,6 @@ export async function fetchBuildings(): Promise<ApiResult<BuildingSummary[]>> {
       : json && "buildings" in json
         ? json.buildings
         : [];
-    // Do not invent seed buildings when DB is empty — that sends operators to
-    // /buildings/seed-building-kolonaki/shares with a 404 → fake empty state.
     return { ok: true, data: list };
   } catch {
     return pendingResult(SEED_BUILDINGS);
@@ -239,11 +276,9 @@ export async function fetchBuildingTransactions(
     const res = await fetch(`/api/buildings/${buildingId}/transactions`, {
       method: "GET",
     });
-    if (res.status === 404 || res.status === 501) {
-      return pendingResult([]);
-    }
     if (!res.ok) {
-      return pendingResult([], `Transactions API ${res.status}`);
+      const body = await parseJsonSafe(res);
+      return failureFromStatus(res.status, body, [], "Transactions API");
     }
     const json = (await parseJsonSafe(res)) as
       | TransactionListItem[]
@@ -263,11 +298,9 @@ export async function fetchBuildingTransactions(
 export async function fetchAlerts(): Promise<ApiResult<AlertListItem[]>> {
   try {
     const res = await fetch("/api/alerts", { method: "GET" });
-    if (res.status === 404 || res.status === 501) {
-      return pendingResult([]);
-    }
     if (!res.ok) {
-      return pendingResult([], `Alerts API ${res.status}`);
+      const body = await parseJsonSafe(res);
+      return failureFromStatus(res.status, body, [], "Alerts API");
     }
     const json = (await parseJsonSafe(res)) as
       | AlertListItem[]
@@ -354,25 +387,9 @@ export async function fetchBuildingApartments(
     const res = await fetch(`/api/buildings/${buildingId}/apartments`, {
       method: "GET",
     });
-    if (res.status === 404 || res.status === 501) {
-      const err = await parseJsonSafe(res);
-      const message =
-        err && typeof err === "object" && "error" in err
-          ? String((err as { error: unknown }).error)
-          : `Apartments API ${res.status}`;
-      // 404 building = real missing building (not "API pending").
-      if (res.status === 404) {
-        return errorResult(empty, message);
-      }
-      return pendingResult(empty, message);
-    }
     if (!res.ok) {
       const err = await parseJsonSafe(res);
-      const message =
-        err && typeof err === "object" && "error" in err
-          ? String((err as { error: unknown }).error)
-          : `Apartments API ${res.status}`;
-      return errorResult(empty, message);
+      return failureFromStatus(res.status, err, empty, "Apartments API");
     }
     const json = (await parseJsonSafe(res)) as {
       apartments: ApartmentSharesItem[];
@@ -481,11 +498,9 @@ export async function fetchExpenseCategories(): Promise<
 > {
   try {
     const res = await fetch("/api/expense-categories", { method: "GET" });
-    if (res.status === 404 || res.status === 501) {
-      return pendingResult([]);
-    }
     if (!res.ok) {
-      return pendingResult([], `Categories API ${res.status}`);
+      const body = await parseJsonSafe(res);
+      return failureFromStatus(res.status, body, [], "Categories API");
     }
     const json = (await parseJsonSafe(res)) as {
       categories: ExpenseCategoryItem[];
@@ -529,16 +544,14 @@ export async function fetchKoinoxristaPreview(
       `/api/buildings/${buildingId}/koinoxrista?year=${year}&month=${month}`,
       { method: "GET" },
     );
-    if (res.status === 404 || res.status === 501) {
-      return pendingResult(null);
-    }
     if (!res.ok) {
-      return pendingResult(null, `Κοινόχρηστα API ${res.status}`);
+      const body = await parseJsonSafe(res);
+      return failureFromStatus(res.status, body, null, "Κοινόχρηστα API");
     }
     const data = (await parseJsonSafe(res)) as KoinoxristaPreview;
     return { ok: true, data };
   } catch {
-    return pendingResult(null);
+    return errorResult(null, "Αποτυχία σύνδεσης με το API κοινοχρήστων");
   }
 }
 
@@ -606,16 +619,14 @@ export async function fetchCollections(
       `/api/buildings/${buildingId}/collections${q ? `?${q}` : ""}`,
       { method: "GET" },
     );
-    if (res.status === 404 || res.status === 501) {
-      return pendingResult(null);
-    }
     if (!res.ok) {
-      return pendingResult(null, `Collections API ${res.status}`);
+      const body = await parseJsonSafe(res);
+      return failureFromStatus(res.status, body, null, "Collections API");
     }
     const data = (await parseJsonSafe(res)) as CollectionsResponse;
     return { ok: true, data };
   } catch {
-    return pendingResult(null);
+    return errorResult(null, "Αποτυχία σύνδεσης με το API εισπράξεων");
   }
 }
 
