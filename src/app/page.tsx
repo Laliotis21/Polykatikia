@@ -12,30 +12,30 @@ import { buttonStyles } from "@/components/ui/Button";
 const CAPABILITIES = [
   {
     icon: ScanLine,
-    title: "Αποδείξεις με OCR",
-    body: "Ανεβάστε τιμολόγιο ή απόδειξη και το ποσό διαβάζεται αυτόματα. Ο χειριστής επιβεβαιώνει πάντα πριν καταχωριστεί.",
+    title: "Απόδειξη σε δευτερόλεπτα",
+    body: "Ανεβάζετε τιμολόγιο ή φωτογραφία και το ποσό διαβάζεται μόνο του. Εσείς επιβεβαιώνετε πριν καταχωριστεί οτιδήποτε.",
   },
   {
     icon: ShieldCheck,
-    title: "Καμία σιωπηλή διόρθωση",
-    body: "Όταν το ποσό του χειριστή διαφέρει από το OCR, απαιτείται γραπτή αιτιολόγηση. Η απόκλιση μένει στο ιστορικό.",
+    title: "Κάθε διόρθωση με λόγο",
+    body: "Αν το ποσό που βάζετε διαφέρει από την ανάγνωση, ζητείται σύντομη εξήγηση. Η απόκλιση μένει στο ιστορικό — καθαρά και ξεκάθαρα.",
   },
   {
     icon: Calculator,
-    title: "Κατανομή σε χιλιοστά",
-    body: "Γενικά, ανελκυστήρα και θέρμανση με ξεχωριστά κλειδιά. Τα ποσά τηρούνται σε ακέραια λεπτά — χωρίς σφάλματα στρογγυλοποίησης.",
+    title: "Κατανομή με χιλιοστά",
+    body: "Γενικά, ανελκυστήρας και θέρμανση με ξεχωριστά κλειδιά. Τα ποσά σε ακέραια λεπτά, χωρίς λάθη στρογγυλοποίησης.",
   },
   {
     icon: Bell,
-    title: "Ειδοποιήσεις ανωμαλιών",
-    body: "Δαπάνη εκτός του συνηθισμένου εύρους του κτιρίου σηκώνει ειδοποίηση προτού φτάσει στους ιδιοκτήτες.",
+    title: "Ειδοποίηση όταν κάτι ξεφεύγει",
+    body: "Δαπάνη έξω από το συνηθισμένο εύρος του κτιρίου σηκώνει ειδοποίηση πριν φτάσει στους ιδιοκτήτες.",
   },
 ];
 
 const FLOW = [
   { step: "01", label: "Ανέβασμα", detail: "PDF ή φωτογραφία απόδειξης" },
   { step: "02", label: "Έλεγχος", detail: "Επιβεβαίωση ποσού και προμηθευτή" },
-  { step: "03", label: "Αιτιολόγηση", detail: "Γραπτή εξήγηση κάθε απόκλισης" },
+  { step: "03", label: "Εξήγηση", detail: "Σύντομος λόγος για κάθε απόκλιση" },
   { step: "04", label: "Κατανομή", detail: "Χρέωση ανά διαμέρισμα σε χιλιοστά" },
 ];
 
@@ -53,7 +53,7 @@ export default function HomePage() {
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 md:px-8">
           <BrandLockup />
           <Link href="/login" className={buttonStyles("primary", "sm")}>
-            Σύνδεση χειριστή
+            Είσοδος
           </Link>
         </div>
       </header>
@@ -64,12 +64,12 @@ export default function HomePage() {
           <div className="rise flex flex-col items-start gap-6">
             <span className="inline-flex items-center gap-2 rounded-full border border-aegean-200 bg-aegean-50 px-3 py-1 text-xs font-semibold text-aegean-700">
               <ShieldCheck className="size-3.5" aria-hidden strokeWidth={2.2} />
-              Λογιστική ακεραιότητα σε ακέραια λεπτά
+              Κάθε ευρώ έχει πηγή
             </span>
             <h1 className="text-4xl font-extrabold text-ink">
               Κοινόχρηστα που{" "}
               <span className="relative whitespace-nowrap text-aegean-700">
-                αντέχουν σε έλεγχο
+                εξηγούνται
                 <span
                   aria-hidden
                   className="absolute inset-x-0 -bottom-1 h-2 rounded-full bg-brass-200/70"
@@ -78,13 +78,13 @@ export default function HomePage() {
               .
             </h1>
             <p className="max-w-xl text-lg text-ink-muted">
-              Κάθε ευρώ που χρεώνεται σε διαμέρισμα ανάγεται σε μια απόδειξη, σε
-              έναν χειριστή και σε μια χρονοσφραγίδα. Χωρίς αδιαφανή υπολογιστικά
-              φύλλα, χωρίς αδικαιολόγητες διορθώσεις.
+              Κάθε χρέωση ξεκινά από μια απόδειξη, περνά από εσάς και καταλήγει
+              στο διαμέρισμα. Χωρίς ασαφή υπολογιστικά φύλλα και χωρίς διορθώσεις
+              χωρίς λόγο.
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <Link href="/login" className={buttonStyles("primary", "lg")}>
-                Σύνδεση χειριστή
+                Ξεκινήστε
                 <ArrowRight className="size-4" aria-hidden strokeWidth={2.2} />
               </Link>
               <Link href="#pos" className={buttonStyles("secondary", "lg")}>
@@ -135,7 +135,7 @@ export default function HomePage() {
                 aria-hidden
                 strokeWidth={2}
               />
-              Άθροισμα κατανομής ίσο με το σύνολο δαπάνης — έλεγχος επιτυχής
+              Το άθροισμα ταιριάζει με τη δαπάνη — όλα εντάξει
             </p>
           </div>
         </section>
@@ -149,7 +149,7 @@ export default function HomePage() {
             id="capabilities-title"
             className="max-w-2xl text-3xl font-extrabold text-ink"
           >
-            Φτιαγμένο για διαχειριστές που λογοδοτούν
+            Όσα χρειάζεστε για καθαρή διαχείριση
           </h2>
           <dl className="mt-12 grid gap-x-12 gap-y-10 sm:grid-cols-2">
             {CAPABILITIES.map(({ icon: Icon, title, body }) => (
@@ -178,7 +178,7 @@ export default function HomePage() {
             id="flow-title"
             className="max-w-2xl text-3xl font-extrabold text-ink"
           >
-            Τέσσερα βήματα, από την απόδειξη στη χρέωση
+            Από την απόδειξη στη χρέωση, σε τέσσερα βήματα
           </h2>
           <ol className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {FLOW.map(({ step, label, detail }) => (
@@ -202,11 +202,11 @@ export default function HomePage() {
         <section className="rise border-t border-border-soft py-16 md:py-20">
           <div className="flex flex-col items-start gap-6 rounded-2xl bg-aegean-900 px-8 py-12 text-white md:px-12">
             <h2 className="max-w-2xl text-3xl font-extrabold text-white">
-              Ξεκινήστε με τον λογαριασμό χειριστή σας
+              Έτοιμοι για την επόμενη περίοδο;
             </h2>
             <p className="max-w-xl text-aegean-100">
-              Συνδεθείτε για να ανεβάσετε αποδείξεις, να ελέγξετε αποκλίσεις και
-              να οριστικοποιήσετε τα κοινόχρηστα της περιόδου.
+              Μπείτε για να ανεβάσετε αποδείξεις, να ελέγξετε αποκλίσεις και να
+              κλείσετε τα κοινόχρηστα με ηρεμία.
             </p>
             <Link
               href="/login"
@@ -216,7 +216,7 @@ export default function HomePage() {
                 "bg-white text-aegean-800 hover:bg-brass-100 hover:text-aegean-900",
               )}
             >
-              Σύνδεση
+              Είσοδος
               <ArrowRight className="size-4" aria-hidden strokeWidth={2.2} />
             </Link>
           </div>
@@ -225,7 +225,7 @@ export default function HomePage() {
 
       <footer className="border-t border-border-soft py-8">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 text-sm text-ink-muted md:px-8">
-          <p>Πολυκατοικία · Διαχείριση κοινοχρήστων</p>
+          <p>Πολυκατοικία · Κοινόχρηστα με διαφάνεια</p>
           <p className="font-mono-amounts text-xs">
             Ποσά σε ακέραια λεπτά · el-GR · EUR
           </p>
