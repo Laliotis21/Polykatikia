@@ -39,6 +39,15 @@ const patchBodySchema = z.object({
   owner: ownerPatchSchema.optional(),
 });
 
+const createBodySchema = z.object({
+  label: z.string().trim().min(1).max(64),
+  shareBps: z.number().int().min(0).max(10000).default(0),
+  elevatorShareBps: z.number().int().min(0).max(10000).default(0),
+  heatingShareBps: z.number().int().min(0).max(10000).default(0),
+  floor: z.number().int().min(-5).max(100).nullable().optional(),
+  owner: ownerPatchSchema.optional(),
+});
+
 /**
  * GET /api/buildings/:id/apartments
  * List apartments with χιλιοστά. VIEWER+.
@@ -95,6 +104,117 @@ export async function GET(_request: Request, context: RouteContext) {
         heatingShareBps: apartments.reduce((s, a) => s + a.heatingShareBps, 0),
       },
     });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : "Unexpected error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+/**
+ * POST /api/buildings/:id/apartments
+ * Create apartment with χιλιοστά (+ optional owner). OPERATOR+.
+ */
+export async function POST(request: Request, context: RouteContext) {
+  try {
+    const user = requireOperator(await getSessionUser());
+    const { id: buildingId } = await context.params;
+    const json: unknown = await request.json();
+    const parsed = createBodySchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: parsed.error.issues },
+        { status: 400 },
+      );
+    }
+
+    const building = await prisma.building.findUnique({
+      where: { id: buildingId },
+      select: { id: true },
+    });
+    if (!building) {
+      return NextResponse.json({ error: "Building not found" }, { status: 404 });
+    }
+
+    const existingLabel = await prisma.apartment.findFirst({
+      where: { buildingId, label: parsed.data.label },
+      select: { id: true },
+    });
+    if (existingLabel) {
+      return NextResponse.json(
+        { error: `Υπάρχει ήδη διαμέρισμα «${parsed.data.label}»` },
+        { status: 409 },
+      );
+    }
+
+    const apartment = await prisma.apartment.create({
+      data: {
+        buildingId,
+        label: parsed.data.label,
+        shareBps: parsed.data.shareBps,
+        elevatorShareBps: parsed.data.elevatorShareBps,
+        heatingShareBps: parsed.data.heatingShareBps,
+        floor: parsed.data.floor ?? null,
+      },
+    });
+
+    let ownerPayload: {
+      id: string;
+      name: string;
+      email: string | null;
+      phone: string | null;
+    } | null = null;
+
+    if (parsed.data.owner?.name?.trim()) {
+      const owner = await prisma.owner.create({
+        data: {
+          name: parsed.data.owner.name.trim(),
+          email: parsed.data.owner.email ?? null,
+          phone: parsed.data.owner.phone ?? null,
+        },
+        select: { id: true, name: true, email: true, phone: true },
+      });
+      await prisma.apartmentOwner.create({
+        data: {
+          apartmentId: apartment.id,
+          ownerId: owner.id,
+          fromDate: new Date(),
+        },
+      });
+      ownerPayload = owner;
+    }
+
+    await appendAuditLog({
+      actorId: user.id,
+      action: "APARTMENT_CREATED",
+      entityType: "Apartment",
+      entityId: apartment.id,
+      after: {
+        label: apartment.label,
+        shareBps: apartment.shareBps,
+        elevatorShareBps: apartment.elevatorShareBps,
+        heatingShareBps: apartment.heatingShareBps,
+        floor: apartment.floor,
+        ownerId: ownerPayload?.id ?? null,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        apartment: {
+          id: apartment.id,
+          label: apartment.label,
+          shareBps: apartment.shareBps,
+          elevatorShareBps: apartment.elevatorShareBps,
+          heatingShareBps: apartment.heatingShareBps,
+          floor: apartment.floor,
+          owner: ownerPayload,
+        },
+      },
+      { status: 201 },
+    );
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

@@ -9,22 +9,24 @@ import {
   useTransition,
 } from "react";
 import Link from "next/link";
-import { Calculator, Scale } from "lucide-react";
+import { Calculator, Plus, Scale } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Section } from "@/components/ui/Section";
 import { Button, buttonStyles } from "@/components/ui/Button";
-import { controlStyles } from "@/components/ui/Field";
+import { Field, controlStyles, inputStyles } from "@/components/ui/Field";
 import { Badge } from "@/components/ui/Badge";
 import {
   ALLOCATION_METHOD_LABELS,
+  createApartment,
   fetchBuildingApartments,
   fetchExpenseCategories,
   patchApartmentShares,
   patchExpenseCategory,
   SEED_BUILDINGS,
 } from "@/components/api/operator-api";
+import { DEFAULT_BUILDING_ID } from "@/components/shell/nav";
 import type {
   AllocationMethod,
   ApartmentSharesItem,
@@ -77,7 +79,14 @@ export default function SharesPage({
   const [isPending, startTransition] = useTransition();
   const formId = useId();
 
+  const [newLabel, setNewLabel] = useState("");
+  const [newFloor, setNewFloor] = useState("");
+  const [newShareBps, setNewShareBps] = useState("0");
+  const [newElevatorBps, setNewElevatorBps] = useState("0");
+  const [newHeatingBps, setNewHeatingBps] = useState("0");
+
   const buildingName = SEED_BUILDINGS.find((b) => b.id === id)?.name ?? id;
+  const isSeedBuilding = id === DEFAULT_BUILDING_ID;
 
   const reload = useCallback(async () => {
     const [aptResult, catResult] = await Promise.all([
@@ -91,6 +100,13 @@ export default function SharesPage({
       (!aptResult.ok && Boolean(aptResult.pending)) ||
         (!catResult.ok && Boolean(catResult.pending)),
     );
+    if (!aptResult.ok && !aptResult.pending) {
+      setError(aptResult.message);
+    } else if (!aptResult.ok && aptResult.pending) {
+      setError(null);
+    } else {
+      setError(null);
+    }
     setLoading(false);
   }, [id]);
 
@@ -132,6 +148,49 @@ export default function SharesPage({
       setStatus(`Αποθηκεύτηκε το διαμέρισμα ${apt.label}`);
       await reload();
       setSavingId(null);
+    });
+  }
+
+  function addApartment() {
+    setError(null);
+    setStatus(null);
+    const label = newLabel.trim();
+    if (!label) {
+      setError("Το όνομα διαμερίσματος είναι υποχρεωτικό.");
+      return;
+    }
+    const shareBps = Number(newShareBps);
+    const elevatorShareBps = Number(newElevatorBps);
+    const heatingShareBps = Number(newHeatingBps);
+    if (
+      [shareBps, elevatorShareBps, heatingShareBps].some(
+        (n) => !Number.isFinite(n) || n < 0 || n > TOTAL_BPS,
+      )
+    ) {
+      setError("Τα χιλιοστά πρέπει να είναι ακέραιοι 0–10.000.");
+      return;
+    }
+    startTransition(async () => {
+      const result = await createApartment(id, {
+        label,
+        shareBps,
+        elevatorShareBps,
+        heatingShareBps,
+        floor: newFloor === "" ? null : Number(newFloor),
+      });
+      if (!result.ok || !result.data) {
+        setError(
+          result.ok ? "Η δημιουργία δεν επιβεβαιώθηκε." : result.message,
+        );
+        return;
+      }
+      setStatus(`Προστέθηκε το διαμέρισμα ${result.data.label}`);
+      setNewLabel("");
+      setNewFloor("");
+      setNewShareBps("0");
+      setNewElevatorBps("0");
+      setNewHeatingBps("0");
+      await reload();
     });
   }
 
@@ -181,6 +240,76 @@ export default function SharesPage({
     });
   }
 
+  const addApartmentForm = (
+    <form
+      className="flex w-full max-w-2xl flex-col gap-3 text-left"
+      onSubmit={(e) => {
+        e.preventDefault();
+        addApartment();
+      }}
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field htmlFor={`${formId}-new-label`} label="Διαμέρισμα">
+          <input
+            id={`${formId}-new-label`}
+            className={inputStyles}
+            value={newLabel}
+            placeholder="π.χ. Α1"
+            onChange={(e) => setNewLabel(e.target.value)}
+            required
+          />
+        </Field>
+        <Field htmlFor={`${formId}-new-floor`} label="Όροφος">
+          <input
+            id={`${formId}-new-floor`}
+            type="number"
+            className={inputStyles}
+            value={newFloor}
+            placeholder="1"
+            onChange={(e) => setNewFloor(e.target.value)}
+          />
+        </Field>
+        <Field htmlFor={`${formId}-new-share`} label="Γενικά (bps)">
+          <input
+            id={`${formId}-new-share`}
+            type="number"
+            min={0}
+            max={TOTAL_BPS}
+            className={inputStyles}
+            value={newShareBps}
+            onChange={(e) => setNewShareBps(e.target.value)}
+          />
+        </Field>
+        <Field htmlFor={`${formId}-new-elev`} label="Ανελκυστήρας (bps)">
+          <input
+            id={`${formId}-new-elev`}
+            type="number"
+            min={0}
+            max={TOTAL_BPS}
+            className={inputStyles}
+            value={newElevatorBps}
+            onChange={(e) => setNewElevatorBps(e.target.value)}
+          />
+        </Field>
+        <Field htmlFor={`${formId}-new-heat`} label="Θέρμανση (bps)">
+          <input
+            id={`${formId}-new-heat`}
+            type="number"
+            min={0}
+            max={TOTAL_BPS}
+            className={inputStyles}
+            value={newHeatingBps}
+            onChange={(e) => setNewHeatingBps(e.target.value)}
+          />
+        </Field>
+      </div>
+      <Button type="submit" loading={isPending} className="self-start">
+        <Plus className="size-4" aria-hidden strokeWidth={2} />
+        Προσθήκη διαμερίσματος
+      </Button>
+    </form>
+  );
+
   return (
     <div className="flex flex-col gap-10">
       <PageHeader
@@ -218,18 +347,45 @@ export default function SharesPage({
       {loading ? (
         <LoadingState label="Φόρτωση χιλιοστών…" />
       ) : apartments.length === 0 ? (
-        <EmptyState
-          icon={Scale}
-          title="Δεν υπάρχουν διαμερίσματα"
-          description="Προσθέστε διαμερίσματα στο κτίριο για να ορίσετε χιλιοστά και κλειδιά κατανομής."
-          pending={pending}
-        />
+        <>
+          <EmptyState
+            icon={Scale}
+            title="Δεν υπάρχουν διαμερίσματα"
+            description={
+              isSeedBuilding
+                ? "Προσθέστε διαμερίσματα παρακάτω για να ορίσετε χιλιοστά. Το demo Κολωνάκι 12 θα γεμίσει αυτόματα μετά το επόμενο deploy αν λείπουν από τη βάση."
+                : "Αυτό το κτίριο δεν έχει διαμερίσματα ακόμα. Προσθέστε παρακάτω, ή ανοίξτε το demo Κολωνάκι 12 όπου υπάρχουν έτοιμα χιλιοστά."
+            }
+            pending={pending}
+            action={
+              <div className="flex flex-col items-center gap-4">
+                {!isSeedBuilding ? (
+                  <Link
+                    href={`/buildings/${DEFAULT_BUILDING_ID}/shares`}
+                    className={buttonStyles("secondary")}
+                  >
+                    Άνοιγμα Κολωνάκι 12
+                  </Link>
+                ) : null}
+                {addApartmentForm}
+              </div>
+            }
+          />
+        </>
       ) : (
         <>
           <Section
+            title="Νέο διαμέρισμα"
+            description="Προσθέστε διαμέρισμα με χιλιοστά (bps, σύνολο 10.000)."
+            order={0}
+          >
+            {addApartmentForm}
+          </Section>
+
+          <Section
             title="Διαμερίσματα & επαφές"
             description="Χιλιοστά σε bps (σύνολο 10.000) και στοιχεία επικοινωνίας ιδιοκτήτη."
-            order={0}
+            order={1}
           >
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               <TotalBadge label="Γενικά" bps={totals.shareBps} />
@@ -415,7 +571,7 @@ export default function SharesPage({
           <Section
             title="Κατηγορίες δαπανών"
             description="Κάθε κατηγορία επιμερίζεται με το δικό της κλειδί κατανομής."
-            order={1}
+            order={2}
           >
             <div className="panel overflow-x-auto">
               <table

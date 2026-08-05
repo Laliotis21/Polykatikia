@@ -36,6 +36,10 @@ export function BuildingSelector({
   buildingIdRef.current = buildingId;
   const onBuildingChangeRef = useRef(onBuildingChange);
   onBuildingChangeRef.current = onBuildingChange;
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +56,27 @@ export function BuildingSelector({
         if (known) {
           onBuildingChangeRef.current(stored);
           notifyBuildingSelected(stored);
+          return;
+        }
+      }
+      // Drop stale / invented ids (e.g. seed fallback when DB has other buildings).
+      const currentKnown = result.data.some(
+        (b) => b.id === buildingIdRef.current,
+      );
+      if (!currentKnown && result.data.length > 0) {
+        const preferred =
+          result.data.find((b) => b.id === "seed-building-kolonaki") ??
+          result.data[0]!;
+        writeStoredBuildingId(preferred.id);
+        onBuildingChangeRef.current(preferred.id);
+        notifyBuildingSelected(preferred.id);
+        const path = pathnameRef.current;
+        if (
+          /^\/buildings\/[^/]+\/(expenses|koinoxrista|shares|collections)/.test(
+            path,
+          )
+        ) {
+          routerRef.current.replace(buildingScopedHref(path, preferred.id));
         }
       }
     }

@@ -95,9 +95,8 @@ export async function fetchBuildings(): Promise<ApiResult<BuildingSummary[]>> {
       : json && "buildings" in json
         ? json.buildings
         : [];
-    if (list.length === 0) {
-      return { ok: true, data: SEED_BUILDINGS };
-    }
+    // Do not invent seed buildings when DB is empty — that sends operators to
+    // /buildings/seed-building-kolonaki/shares with a 404 → fake empty state.
     return { ok: true, data: list };
   } catch {
     return pendingResult(SEED_BUILDINGS);
@@ -356,10 +355,24 @@ export async function fetchBuildingApartments(
       method: "GET",
     });
     if (res.status === 404 || res.status === 501) {
-      return pendingResult(empty);
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Apartments API ${res.status}`;
+      // 404 building = real missing building (not "API pending").
+      if (res.status === 404) {
+        return errorResult(empty, message);
+      }
+      return pendingResult(empty, message);
     }
     if (!res.ok) {
-      return pendingResult(empty, `Apartments API ${res.status}`);
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Apartments API ${res.status}`;
+      return errorResult(empty, message);
     }
     const json = (await parseJsonSafe(res)) as {
       apartments: ApartmentSharesItem[];
@@ -378,6 +391,47 @@ export async function fetchBuildingApartments(
     };
   } catch {
     return pendingResult(empty);
+  }
+}
+
+export async function createApartment(
+  buildingId: string,
+  body: {
+    label: string;
+    shareBps?: number;
+    elevatorShareBps?: number;
+    heatingShareBps?: number;
+    floor?: number | null;
+    owner?: {
+      name?: string;
+      email?: string | null;
+      phone?: string | null;
+    };
+  },
+): Promise<ApiResult<ApartmentSharesItem | null>> {
+  try {
+    const res = await fetch(`/api/buildings/${buildingId}/apartments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 404 || res.status === 501) {
+      return pendingResult(null);
+    }
+    if (!res.ok) {
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Create failed (${res.status})`;
+      return errorResult(null, message);
+    }
+    const json = (await parseJsonSafe(res)) as {
+      apartment: ApartmentSharesItem;
+    };
+    return { ok: true, data: json.apartment };
+  } catch {
+    return pendingResult(null);
   }
 }
 
