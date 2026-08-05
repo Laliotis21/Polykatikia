@@ -1,6 +1,81 @@
 import { PrismaClient, Role } from "@prisma/client";
+import { finalizeKoinoxristaSettlement } from "../src/domain/koinoxrista";
+import { KoinoxristaError } from "../src/domain/koinoxrista/errors";
+import { payCharge } from "../src/domain/payments";
 
 const prisma = new PrismaClient();
+
+const BUILDING_ID = "seed-building-kolonaki";
+const DEMO_YEAR = 2026;
+const DEMO_MONTH = 8;
+
+/**
+ * Wipe period settlement (and linked payments) then finalize fresh.
+ * Safe re-run: always converges to same demo charges from current EXPENSE rows.
+ */
+async function ensureFinalizedPeriod(input: {
+  buildingId: string;
+  year: number;
+  month: number;
+  createdById: string;
+}): Promise<{ settlementId: string; totalCents: number; chargeCount: number }> {
+  const existing = await prisma.commonExpenseSettlement.findUnique({
+    where: {
+      buildingId_year_month: {
+        buildingId: input.buildingId,
+        year: input.year,
+        month: input.month,
+      },
+    },
+    select: {
+      id: true,
+      chargeTransactions: { select: { id: true } },
+    },
+  });
+
+  if (existing) {
+    const chargeIds = existing.chargeTransactions.map((c) => c.id);
+    if (chargeIds.length > 0) {
+      // paysChargeId FK is Restrict — drop INCOME rows before charges/settlement.
+      await prisma.transaction.deleteMany({
+        where: { paysChargeId: { in: chargeIds } },
+      });
+    }
+    await prisma.commonExpenseSettlement.delete({ where: { id: existing.id } });
+  }
+
+  // Orphan CHARGEs from a prior attempt without settlementId.
+  const label = `${String(input.month).padStart(2, "0")}/${input.year}`;
+  const orphans = await prisma.transaction.findMany({
+    where: {
+      buildingId: input.buildingId,
+      type: "CHARGE",
+      description: { startsWith: `Κοινόχρηστα ${label}` },
+    },
+    select: { id: true },
+  });
+  if (orphans.length > 0) {
+    const orphanIds = orphans.map((o) => o.id);
+    await prisma.transaction.deleteMany({
+      where: { paysChargeId: { in: orphanIds } },
+    });
+    await prisma.transaction.deleteMany({ where: { id: { in: orphanIds } } });
+  }
+
+  try {
+    const result = await finalizeKoinoxristaSettlement(prisma, input);
+    return {
+      settlementId: result.settlementId,
+      totalCents: result.totalCents,
+      chargeCount: result.chargeTransactionIds.length,
+    };
+  } catch (err) {
+    if (err instanceof KoinoxristaError) {
+      throw new Error(`Finalize ${label} failed: ${err.message}`);
+    }
+    throw err;
+  }
+}
 
 async function main() {
   const admin = await prisma.user.upsert({
@@ -24,10 +99,13 @@ async function main() {
   });
 
   const building = await prisma.building.upsert({
-    where: { id: "seed-building-kolonaki" },
-    update: {},
+    where: { id: BUILDING_ID },
+    update: {
+      name: "Κολωνάκι 12",
+      address: "Σκουφά 12, Αθήνα",
+    },
     create: {
-      id: "seed-building-kolonaki",
+      id: BUILDING_ID,
       name: "Κολωνάκι 12",
       address: "Σκουφά 12, Αθήνα",
     },
@@ -77,6 +155,7 @@ async function main() {
         heatingShareBps: apt.heatingShareBps,
         floor: apt.floor,
         label: apt.label,
+        buildingId: building.id,
       },
       create: {
         id: apt.id,
@@ -202,7 +281,7 @@ async function main() {
     });
   }
 
-  // Winter HEATING demo expense — allocated via static heatingShareBps (not meters).
+  // Prior-month HEATING expense (Jan 2026) — finalized below for history.
   const heatingExpense = await prisma.transaction.upsert({
     where: { id: "seed-tx-heating-jan-2026" },
     update: {
@@ -223,7 +302,7 @@ async function main() {
     },
   });
 
-  // Current-month demo expenses for live finalize → collections → portal story.
+  // Current-month demo expenses for Aug 2026 κοινόχρηστα.
   const cleaningAug = await prisma.transaction.upsert({
     where: { id: "seed-tx-cleaning-aug-2026" },
     update: {
@@ -264,6 +343,26 @@ async function main() {
     },
   });
 
+  const commonAug = await prisma.transaction.upsert({
+    where: { id: "seed-tx-common-aug-2026" },
+    update: {
+      amountCents: 22000,
+      description: "Κοινόχρηστα (ρεύμα / νερό) — Αύγουστος 2026",
+      occurredAt: new Date("2026-08-04T14:00:00.000Z"),
+      categoryId: "seed-cat-common",
+    },
+    create: {
+      id: "seed-tx-common-aug-2026",
+      buildingId: building.id,
+      categoryId: "seed-cat-common",
+      type: "EXPENSE",
+      amountCents: 22000,
+      description: "Κοινόχρηστα (ρεύμα / νερό) — Αύγουστος 2026",
+      occurredAt: new Date("2026-08-04T14:00:00.000Z"),
+      createdById: admin.id,
+    },
+  });
+
   await prisma.user.upsert({
     where: { email: "portal@polykatoikia.local" },
     update: {},
@@ -274,13 +373,84 @@ async function main() {
     },
   });
 
+  // Pre-finalize so Collections + Portal show charges without operator click.
+  const janSettlement = await ensureFinalizedPeriod({
+    buildingId: building.id,
+    year: 2026,
+    month: 1,
+    createdById: admin.id,
+  });
+
+  const augSettlement = await ensureFinalizedPeriod({
+    buildingId: building.id,
+    year: DEMO_YEAR,
+    month: DEMO_MONTH,
+    createdById: admin.id,
+  });
+
+  // Mark Α1 (Μαρία) Aug charge as PAID; leave A2/B1/B2 OPEN for Εισπράξεις mix.
+  const mariaAugCharge = await prisma.transaction.findFirst({
+    where: {
+      buildingId: building.id,
+      type: "CHARGE",
+      apartmentId: "seed-apt-a1",
+      settlement: { year: DEMO_YEAR, month: DEMO_MONTH },
+    },
+    include: { payment: { select: { id: true } } },
+  });
+
+  let paidCharge: { chargeId: string; incomeId: string; alreadyPaid: boolean } | null =
+    null;
+  if (mariaAugCharge) {
+    const paid = await payCharge(prisma, {
+      chargeId: mariaAugCharge.id,
+      createdById: admin.id,
+      description: `Πληρωμή (demo seed) · ${mariaAugCharge.description ?? mariaAugCharge.id}`,
+      occurredAt: new Date("2026-08-06T10:00:00.000Z"),
+    });
+    paidCharge = {
+      chargeId: paid.chargeId,
+      incomeId: paid.incomeId,
+      alreadyPaid: paid.alreadyPaid,
+    };
+  }
+
+  const [aptCount, expenseCount, chargeCount, openCharges, paidCharges, portalOwners] =
+    await Promise.all([
+      prisma.apartment.count({ where: { buildingId: building.id } }),
+      prisma.transaction.count({
+        where: { buildingId: building.id, type: "EXPENSE" },
+      }),
+      prisma.transaction.count({
+        where: { buildingId: building.id, type: "CHARGE" },
+      }),
+      prisma.transaction.count({
+        where: {
+          buildingId: building.id,
+          type: "CHARGE",
+          payment: { is: null },
+        },
+      }),
+      prisma.transaction.count({
+        where: {
+          buildingId: building.id,
+          type: "CHARGE",
+          payment: { isNot: null },
+        },
+      }),
+      prisma.owner.count({ where: { portalToken: { not: null } } }),
+    ]);
+
   console.log("Seed complete:", {
     admin: admin.email,
     operator: operator.email,
     building: building.name,
-    apartments: apartments.length,
+    apartments: aptCount,
     owners: owners.length,
     categories: categories.length,
+    expenses: expenseCount,
+    charges: { total: chargeCount, open: openCharges, paid: paidCharges },
+    portalTokens: portalOwners,
     heatingExpense: {
       id: heatingExpense.id,
       amountCents: heatingExpense.amountCents,
@@ -289,7 +459,15 @@ async function main() {
     demoAug2026: {
       cleaning: cleaningAug.id,
       elevator: elevatorAug.id,
+      common: commonAug.id,
+      totalExpenseCents:
+        cleaningAug.amountCents + elevatorAug.amountCents + commonAug.amountCents,
     },
+    settlements: {
+      jan2026: janSettlement,
+      aug2026: augSettlement,
+    },
+    paidDemo: paidCharge,
     portalDemo: "/portal/demo-portal-maria",
   });
 }
