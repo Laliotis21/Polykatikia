@@ -5,12 +5,15 @@ import {
   getSessionUser,
   requireOperator,
   requireViewer,
+  AuthError,
 } from "@/lib/auth";
 import {
   finalizeKoinoxristaSettlement,
   previewKoinoxrista,
 } from "@/domain/koinoxrista";
 import { mapKoinoxristaHttpError } from "@/domain/koinoxrista/http";
+import { sendKoinoxristaIssuedEvent } from "@/inngest/events";
+import { sendIssuanceNoticesForCharges } from "@/domain/notices";
 
 export const runtime = "nodejs";
 
@@ -60,6 +63,9 @@ export async function GET(request: Request, context: RouteContext) {
 
     return NextResponse.json({ building, ...preview });
   } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     const mapped = mapKoinoxristaHttpError(err);
     if (mapped) {
       return NextResponse.json({ error: mapped.error }, { status: mapped.status });
@@ -72,6 +78,7 @@ export async function GET(request: Request, context: RouteContext) {
 /**
  * POST /api/buildings/:id/koinoxrista
  * Finalize settlement + create CHARGE txs per apartment. OPERATOR+.
+ * Enqueues (and sync-fallback) owner issuance notices.
  */
 export async function POST(request: Request, context: RouteContext) {
   try {
@@ -80,7 +87,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     const building = await prisma.building.findUnique({
       where: { id: buildingId },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     if (!building) {
       return NextResponse.json({ error: "Building not found" }, { status: 404 });
@@ -102,13 +109,45 @@ export async function POST(request: Request, context: RouteContext) {
       createdById: user.id,
     });
 
+    const requestUrl = new URL(request.url);
+    const appOrigin =
+      process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+      `${requestUrl.protocol}//${requestUrl.host}`;
+
+    let noticesQueued = false;
+    try {
+      await sendKoinoxristaIssuedEvent({
+        settlementId: result.settlementId,
+        buildingId,
+        buildingName: building.name,
+        year: parsed.data.year,
+        month: parsed.data.month,
+        chargeIds: result.chargeTransactionIds,
+        appOrigin,
+      });
+      noticesQueued = true;
+    } catch (err) {
+      console.warn("[koinoxrista] Inngest enqueue failed — sync notices", err);
+      await sendIssuanceNoticesForCharges({
+        chargeIds: result.chargeTransactionIds,
+        buildingName: building.name,
+        year: parsed.data.year,
+        month: parsed.data.month,
+        appOrigin,
+      });
+    }
+
     return NextResponse.json({
       settlementId: result.settlementId,
       totalCents: result.totalCents,
       chargeTransactionIds: result.chargeTransactionIds,
       statement: result.statement,
+      noticesQueued,
     });
   } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     const mapped = mapKoinoxristaHttpError(err);
     if (mapped) {
       return NextResponse.json({ error: mapped.error }, { status: mapped.status });

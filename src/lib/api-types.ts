@@ -172,3 +172,53 @@ export type KoinoxristaPreview = {
     lines: KoinoxristaLine[];
   };
 };
+
+export type CollectionRow = {
+  chargeId: string;
+  apartmentId: string | null;
+  apartmentLabel: string | null;
+  amountCents: number;
+  description: string | null;
+  occurredAt: string;
+  status: "PAID" | "OPEN";
+  incomeId: string | null;
+  paidAt: string | null;
+  ownerName: string | null;
+  ownerEmail: string | null;
+};
+
+export type CollectionsResponse = {
+  building: BuildingSummary;
+  buildingId: string;
+  year: number | null;
+  month: number | null;
+  settlementId: string | null;
+  rows: CollectionRow[];
+  totals: { openCents: number; paidCents: number; chargeCount: number };
+};
+
+export type PortalChargeRow = {
+  chargeId: string;
+  buildingId: string;
+  buildingName: string;
+  apartmentId: string;
+  apartmentLabel: string;
+  amountCents: number;
+  description: string | null;
+  occurredAt: string;
+  status: "PAID" | "OPEN";
+  paidAt: string | null;
+  lines: Array<{ categoryName: string | null; amountCents: number }>;
+};
+
+export type PortalPayload = {
+  owner: { id: string; name: string; email: string | null };
+  charges: PortalChargeRow[];
+};
+
+export type PayChargeResponse = {
+  incomeId: string;
+  chargeId: string;
+  amountCents: number;
+  alreadyPaid: boolean;
+};

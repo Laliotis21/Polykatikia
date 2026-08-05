@@ -22,7 +22,7 @@ export function utcDayKey(d: Date = new Date()): string {
 
 /**
  * CHARGE txs whose occurredAt is before `asOf` (treated as due date in v1).
- * Unpaid = no matching INCOME offset in v1 (all CHARGE past due are overdue).
+ * Unpaid = no linked payment INCOME (`payment` relation / paysChargeId).
  */
 export async function findOverdueCharges(
   db: DbClient = prisma,
@@ -32,6 +32,7 @@ export async function findOverdueCharges(
     where: {
       type: "CHARGE",
       occurredAt: { lt: asOf },
+      payment: null,
     },
     select: {
       id: true,

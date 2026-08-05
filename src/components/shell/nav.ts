@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   ReceiptText,
   Scale,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -13,6 +14,26 @@ import {
 export const DEFAULT_BUILDING_ID = "seed-building-kolonaki";
 
 const STORAGE_KEY = "polykatoikia:selected-building-id";
+
+/** Fired after create/rename so shell + overview refresh building lists. */
+export const BUILDINGS_CHANGED_EVENT = "polykatoikia:buildings-changed";
+
+/** Fired when the active building id changes in the shell selector. */
+export const BUILDING_SELECTION_EVENT = "polykatoikia:building-selected";
+
+export function notifyBuildingsChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(BUILDINGS_CHANGED_EVENT));
+}
+
+export function notifyBuildingSelected(id: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(BUILDING_SELECTION_EVENT, {
+      detail: { buildingId: id },
+    }),
+  );
+}
 
 export type NavItem = {
   href: string;
@@ -74,7 +95,7 @@ export function buildingScopedHref(
   buildingId: string,
 ): string {
   const leaf = pathname.match(
-    /^\/buildings\/[^/]+\/(expenses|koinoxrista|shares)/,
+    /^\/buildings\/[^/]+\/(expenses|koinoxrista|shares|collections)/,
   )?.[1];
   return `/buildings/${buildingId}/${leaf ?? "expenses"}`;
 }
@@ -126,6 +147,12 @@ export function navGroups(buildingId: string): NavGroup[] {
           isActive: (p) => p.endsWith("/koinoxrista"),
         },
         {
+          href: `/buildings/${buildingId}/collections`,
+          label: "Εισπράξεις",
+          icon: Wallet,
+          isActive: (p) => p.endsWith("/collections"),
+        },
+        {
           href: `/buildings/${buildingId}/shares`,
           label: "Χιλιοστά",
           icon: Scale,
@@ -148,6 +175,7 @@ const TITLES: Array<{ match: (p: string) => boolean; title: string }> = [
   },
   { match: (p) => p.endsWith("/expenses"), title: "Έξοδα κτιρίου" },
   { match: (p) => p.endsWith("/koinoxrista"), title: "Κοινόχρηστα" },
+  { match: (p) => p.endsWith("/collections"), title: "Εισπράξεις" },
   { match: (p) => p.endsWith("/shares"), title: "Χιλιοστά & επαφές" },
   { match: (p) => p.startsWith("/alerts"), title: "Ειδοποιήσεις" },
 ];

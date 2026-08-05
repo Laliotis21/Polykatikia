@@ -9,4 +9,5 @@ export const inngest = new Inngest({
 export const EVENTS = {
   ALERT_CREATED: "alert/created",
   RECEIPT_PROCESS: "receipt/process",
+  KOINOXRISTA_ISSUED: "koinoxrista/issued",
 } as const;

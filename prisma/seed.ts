@@ -97,6 +97,7 @@ async function main() {
       email: "maria@example.com",
       phone: "+30 210 123 4501",
       apartmentId: "seed-apt-a1",
+      portalToken: "demo-portal-maria",
     },
     {
       id: "seed-owner-2",
@@ -104,6 +105,7 @@ async function main() {
       email: "giannis@example.com",
       phone: "+30 210 123 4502",
       apartmentId: "seed-apt-a2",
+      portalToken: "demo-portal-giannis",
     },
     {
       id: "seed-owner-3",
@@ -111,6 +113,7 @@ async function main() {
       email: "eleni@example.com",
       phone: "+30 694 123 4503",
       apartmentId: "seed-apt-b1",
+      portalToken: "demo-portal-eleni",
     },
     {
       id: "seed-owner-4",
@@ -118,6 +121,7 @@ async function main() {
       email: null,
       phone: "+30 697 123 4504",
       apartmentId: "seed-apt-b2",
+      portalToken: "demo-portal-nikos",
     },
   ] as const;
 
@@ -130,12 +134,14 @@ async function main() {
         name: owner.name,
         email: owner.email,
         phone: owner.phone,
+        portalToken: owner.portalToken,
       },
       create: {
         id: owner.id,
         name: owner.name,
         email: owner.email,
         phone: owner.phone,
+        portalToken: owner.portalToken,
       },
     });
 
@@ -217,6 +223,57 @@ async function main() {
     },
   });
 
+  // Current-month demo expenses for live finalize → collections → portal story.
+  const cleaningAug = await prisma.transaction.upsert({
+    where: { id: "seed-tx-cleaning-aug-2026" },
+    update: {
+      amountCents: 40000,
+      description: "Καθαριότητα κοινόχρηστων — Αύγουστος 2026",
+      occurredAt: new Date("2026-08-05T09:00:00.000Z"),
+      categoryId: "seed-cat-cleaning",
+    },
+    create: {
+      id: "seed-tx-cleaning-aug-2026",
+      buildingId: building.id,
+      categoryId: "seed-cat-cleaning",
+      type: "EXPENSE",
+      amountCents: 40000,
+      description: "Καθαριότητα κοινόχρηστων — Αύγουστος 2026",
+      occurredAt: new Date("2026-08-05T09:00:00.000Z"),
+      createdById: admin.id,
+    },
+  });
+
+  const elevatorAug = await prisma.transaction.upsert({
+    where: { id: "seed-tx-elevator-aug-2026" },
+    update: {
+      amountCents: 18000,
+      description: "Συντήρηση ανελκυστήρα — Αύγουστος 2026",
+      occurredAt: new Date("2026-08-03T11:00:00.000Z"),
+      categoryId: "seed-cat-elevator",
+    },
+    create: {
+      id: "seed-tx-elevator-aug-2026",
+      buildingId: building.id,
+      categoryId: "seed-cat-elevator",
+      type: "EXPENSE",
+      amountCents: 18000,
+      description: "Συντήρηση ανελκυστήρα — Αύγουστος 2026",
+      occurredAt: new Date("2026-08-03T11:00:00.000Z"),
+      createdById: admin.id,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "portal@polykatoikia.local" },
+    update: {},
+    create: {
+      email: "portal@polykatoikia.local",
+      name: "Portal Demo",
+      role: Role.OPERATOR,
+    },
+  });
+
   console.log("Seed complete:", {
     admin: admin.email,
     operator: operator.email,
@@ -229,6 +286,11 @@ async function main() {
       amountCents: heatingExpense.amountCents,
       month: "2026-01",
     },
+    demoAug2026: {
+      cleaning: cleaningAug.id,
+      elevator: elevatorAug.id,
+    },
+    portalDemo: "/portal/demo-portal-maria",
   });
 }
 

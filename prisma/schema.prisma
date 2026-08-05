@@ -112,6 +112,8 @@ model Owner {
   name      String
   email     String?
   phone     String?
+  /// Opaque token for demo owner portal magic links (`/portal/[token]`).
+  portalToken String? @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -194,6 +196,11 @@ model Transaction {
   receiptId             String?                  @unique
   receipt               Receipt?                 @relation(fields: [receiptId], references: [id])
   mismatchJustification String?
+  /// When type=INCOME: CHARGE this payment settles (demo pay + future PSP webhooks).
+  paysChargeId          String?                  @unique
+  paysCharge            Transaction?             @relation("ChargeSettlement", fields: [paysChargeId], references: [id], onDelete: Restrict)
+  /// Inverse: INCOME row that paid this CHARGE (null = still open).
+  payment               Transaction?             @relation("ChargeSettlement")
   createdById           String
   createdBy             User                     @relation("CreatedBy", fields: [createdById], references: [id])
   createdAt             DateTime                 @default(now())

@@ -94,7 +94,7 @@ export default function KoinoxristaPage({
         return;
       }
       setSuccess(
-        `Οριστικοποιήθηκε · ${result.data.chargeTransactionIds.length} χρεώσεις`,
+        `Οριστικοποιήθηκε · ${result.data.chargeTransactionIds.length} χρεώσεις · ειδοποιήσεις σε ουρά`,
       );
       const refreshed = await fetchKoinoxristaPreview(id, year, month);
       setPreview(refreshed.data);

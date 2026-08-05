@@ -20,6 +20,7 @@ import {
   patchBuilding,
 } from "@/components/api/operator-api";
 import {
+  notifyBuildingsChanged,
   writeStoredBuildingId,
 } from "@/components/shell/nav";
 import type { BuildingSummary } from "@/lib/api-types";
@@ -100,6 +101,7 @@ export default function BuildingsPage() {
       }
       resetForm();
       await reload();
+      notifyBuildingsChanged();
     });
   }
 

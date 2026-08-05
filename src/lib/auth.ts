@@ -29,11 +29,28 @@ export function canView(role: Role): boolean {
 /**
  * Resolve the current operator from Supabase Auth cookies + Prisma `User`.
  * Returns null when Supabase public config is missing or session is absent.
+ *
+ * Demo fallback: when Supabase is unset and `DEMO_AUTH_EMAIL` matches a User,
+ * return that user (local demos without Auth).
  */
 export async function getSessionUser(): Promise<SessionUser | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) {
+    const demoEmail = process.env.DEMO_AUTH_EMAIL?.trim();
+    if (demoEmail) {
+      const dbUser = await prisma.user.findUnique({
+        where: { email: demoEmail },
+        select: { id: true, email: true, role: true },
+      });
+      if (dbUser) {
+        return {
+          id: dbUser.id,
+          email: dbUser.email,
+          role: dbUser.role,
+        };
+      }
+    }
     return null;
   }
 

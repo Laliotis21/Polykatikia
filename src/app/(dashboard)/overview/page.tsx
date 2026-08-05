@@ -21,6 +21,8 @@ import { MoneyText } from "@/components/money/MoneyText";
 import { AlertBadge, severityKind } from "@/components/alerts/AlertBadge";
 import { buttonStyles } from "@/components/ui/Button";
 import {
+  BUILDING_SELECTION_EVENT,
+  BUILDINGS_CHANGED_EVENT,
   DEFAULT_BUILDING_ID,
   resolveBuildingId,
   writeStoredBuildingId,
@@ -94,11 +96,39 @@ export default function OverviewPage() {
     const id = resolveBuildingId("/overview");
     setBuildingId(id);
     writeStoredBuildingId(id);
-    void (async () => {
+
+    let cancelled = false;
+
+    async function syncName(forId: string) {
       const result = await fetchBuildings();
-      const match = result.data.find((b) => b.id === id);
+      if (cancelled) return;
+      const match = result.data.find((b) => b.id === forId);
       if (match) setBuildingName(match.name);
-    })();
+    }
+
+    void syncName(id);
+
+    function onSelected(event: Event) {
+      const nextId = (event as CustomEvent<{ buildingId?: string }>).detail
+        ?.buildingId;
+      if (!nextId) return;
+      setBuildingId(nextId);
+      void syncName(nextId);
+    }
+
+    function onBuildingsChanged() {
+      const next = resolveBuildingId("/overview");
+      setBuildingId(next);
+      void syncName(next);
+    }
+
+    window.addEventListener(BUILDING_SELECTION_EVENT, onSelected);
+    window.addEventListener(BUILDINGS_CHANGED_EVENT, onBuildingsChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(BUILDING_SELECTION_EVENT, onSelected);
+      window.removeEventListener(BUILDINGS_CHANGED_EVENT, onBuildingsChanged);
+    };
   }, []);
 
   useEffect(() => {

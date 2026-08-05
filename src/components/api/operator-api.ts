@@ -7,12 +7,15 @@ import type {
   AlertListItem,
   ApartmentSharesItem,
   BuildingSummary,
+  CollectionsResponse,
   CreateReceiptResponse,
   CreateTransactionBody,
   CreateTransactionResponse,
   ExpenseCategoryItem,
   KoinoxristaPreview,
   PatchAlertBody,
+  PayChargeResponse,
+  PortalPayload,
   ReceiptDetail,
   TransactionListItem,
 } from "@/lib/api-types";
@@ -534,3 +537,103 @@ export const ALLOCATION_METHOD_LABELS: Record<
   EQUAL: "Ισόποσα",
   MANUAL: "Χειροκίνητα",
 };
+
+export async function fetchCollections(
+  buildingId: string,
+  year?: number,
+  month?: number,
+): Promise<ApiResult<CollectionsResponse | null>> {
+  try {
+    const qs = new URLSearchParams();
+    if (year != null) qs.set("year", String(year));
+    if (month != null) qs.set("month", String(month));
+    const q = qs.toString();
+    const res = await fetch(
+      `/api/buildings/${buildingId}/collections${q ? `?${q}` : ""}`,
+      { method: "GET" },
+    );
+    if (res.status === 404 || res.status === 501) {
+      return pendingResult(null);
+    }
+    if (!res.ok) {
+      return pendingResult(null, `Collections API ${res.status}`);
+    }
+    const data = (await parseJsonSafe(res)) as CollectionsResponse;
+    return { ok: true, data };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export async function operatorPayCharge(
+  buildingId: string,
+  chargeId: string,
+): Promise<ApiResult<PayChargeResponse | null>> {
+  try {
+    const res = await fetch(`/api/buildings/${buildingId}/collections`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chargeId }),
+    });
+    if (!res.ok) {
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Pay failed (${res.status})`;
+      return errorResult(null, message);
+    }
+    const data = (await parseJsonSafe(res)) as PayChargeResponse;
+    return { ok: true, data };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export async function fetchPortal(
+  token: string,
+): Promise<ApiResult<PortalPayload | null>> {
+  try {
+    const res = await fetch(`/api/portal/${encodeURIComponent(token)}`, {
+      method: "GET",
+    });
+    if (res.status === 404) {
+      return errorResult(null, "Άκυρος σύνδεσμος portal");
+    }
+    if (!res.ok) {
+      return pendingResult(null, `Portal API ${res.status}`);
+    }
+    const data = (await parseJsonSafe(res)) as PortalPayload;
+    return { ok: true, data };
+  } catch {
+    return pendingResult(null);
+  }
+}
+
+export async function portalPayCharge(
+  token: string,
+  chargeId: string,
+): Promise<ApiResult<PayChargeResponse | null>> {
+  try {
+    const res = await fetch(
+      `/api/portal/${encodeURIComponent(token)}/pay`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chargeId }),
+      },
+    );
+    if (!res.ok) {
+      const err = await parseJsonSafe(res);
+      const message =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : `Pay failed (${res.status})`;
+      return errorResult(null, message);
+    }
+    const data = (await parseJsonSafe(res)) as PayChargeResponse;
+    return { ok: true, data };
+  } catch {
+    return pendingResult(null);
+  }
+}

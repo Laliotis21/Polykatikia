@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { fetchBuildings } from "@/components/api/operator-api";
 import {
+  BUILDINGS_CHANGED_EVENT,
   buildingScopedHref,
+  notifyBuildingSelected,
+  readStoredBuildingId,
   writeStoredBuildingId,
 } from "@/components/shell/nav";
 import { controlStyles } from "@/components/ui/Field";
@@ -29,22 +32,45 @@ export function BuildingSelector({
   const pathname = usePathname();
   const router = useRouter();
   const [buildings, setBuildings] = useState<BuildingSummary[]>([]);
+  const buildingIdRef = useRef(buildingId);
+  buildingIdRef.current = buildingId;
+  const onBuildingChangeRef = useRef(onBuildingChange);
+  onBuildingChangeRef.current = onBuildingChange;
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+
+    async function load() {
       const result = await fetchBuildings();
       if (cancelled) return;
       setBuildings(result.data);
-    })();
+      // After create, buildings page writes storage before notifying —
+      // adopt that id so the select value matches without remount.
+      const stored = readStoredBuildingId();
+      if (stored && stored !== buildingIdRef.current) {
+        const known = result.data.some((b) => b.id === stored);
+        if (known) {
+          onBuildingChangeRef.current(stored);
+          notifyBuildingSelected(stored);
+        }
+      }
+    }
+
+    void load();
+    function onBuildingsChanged() {
+      void load();
+    }
+    window.addEventListener(BUILDINGS_CHANGED_EVENT, onBuildingsChanged);
     return () => {
       cancelled = true;
+      window.removeEventListener(BUILDINGS_CHANGED_EVENT, onBuildingsChanged);
     };
   }, []);
 
   function onChange(nextId: string) {
     writeStoredBuildingId(nextId);
     onBuildingChange(nextId);
+    notifyBuildingSelected(nextId);
     if (/^\/buildings\/[^/]+\/(expenses|koinoxrista|shares)/.test(pathname)) {
       router.push(buildingScopedHref(pathname, nextId));
     }

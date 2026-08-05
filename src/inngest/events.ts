@@ -25,3 +25,20 @@ export async function sendReceiptProcessEvent(
     data: { receiptId },
   });
 }
+
+/** After κοινόχρηστα finalize — email owners with portal links. */
+export async function sendKoinoxristaIssuedEvent(data: {
+  settlementId: string;
+  buildingId: string;
+  buildingName: string;
+  year: number;
+  month: number;
+  chargeIds: string[];
+  appOrigin: string;
+}): Promise<void> {
+  await inngest.send({
+    id: `koinoxrista:${data.settlementId}:issued`,
+    name: EVENTS.KOINOXRISTA_ISSUED,
+    data,
+  });
+}
